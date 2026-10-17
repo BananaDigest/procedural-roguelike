@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Procedural Roguelike</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="hud">
+        <span id="hud-floor">Floor 1</span>
+        <span id="hud-seed">Seed —</span>
+        <span class="hud-hint">WASD / Arrows to move · R: new seed · &gt; to descend</span>
+      </header>
+      <canvas id="game"></canvas>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
