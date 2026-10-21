@@ -1,12 +1,12 @@
 /**
  * Entry point — screen flow, input, feedback, and wiring. Person C owns this.
  *
- * Runs the StubGame (fixture room) so it's playable end-to-end today.
- * INTEGRATION: swap `new StubGame()` for B's real Game (constructed with A's
- * generateLevel). Everything else stays.
+ * Integrated build: real game logic (B's GameImpl) driven by the real world
+ * generator (A's generateLevel), rendered by C's Renderer/HUD/Screens.
  */
-import { StubGame } from "./core/fixtures.ts";
 import { Game } from "./core/types.ts";
+import { GameImpl } from "./game/GameImpl.ts";
+import { generateLevel } from "./generation/LevelChain.ts";
 import { Renderer } from "./render/Renderer.ts";
 import { HUD } from "./ui/HUD.ts";
 import { Screens } from "./ui/Screens.ts";
@@ -21,7 +21,7 @@ const renderer = new Renderer(canvas);
 const hud = new HUD(canvas);
 const screens = new Screens(overlay);
 
-const game: Game = new StubGame();
+const game: Game = new GameImpl(generateLevel);
 let started = false;
 
 // --- feedback (damage flash + mouse blink) ---
@@ -85,10 +85,14 @@ function syncPhase(): void {
 function doMove(dx: number, dy: number): void {
   if (!started || game.state.phase !== "playing") return;
   const prevHp = game.state.player.hp;
-  const prevEnemies = game.state.room.enemies.length;
+  const prevRoom = game.state.room;
+  const prevEnemies = prevRoom.enemies.length;
   game.movePlayer(dx, dy);
-  if (game.state.player.hp < prevHp) triggerFlash("#e2231a"); // took damage
-  else if (game.state.room.enemies.length < prevEnemies) triggerFlash("#ffffff"); // landed a bite
+  const s = game.state;
+  if (s.player.hp < prevHp) triggerFlash("#e2231a"); // took damage
+  else if (s.room === prevRoom && s.room.enemies.length < prevEnemies) {
+    triggerFlash("#ffffff"); // landed a bite (same room → an enemy died)
+  }
   render();
   syncPhase();
 }
