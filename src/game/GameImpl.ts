@@ -155,6 +155,7 @@ export class GameImpl implements Game {
         items: [],
         isBossArena: false,
       },
+      clouds: [],
       phase: "title",
     };
   }
@@ -242,6 +243,7 @@ export class GameImpl implements Game {
       score: 0,
       player: createPlayer(room.entry),
       room,
+      clouds: [],
       phase: "playing",
     };
   }
@@ -357,6 +359,10 @@ export class GameImpl implements Game {
     if (this.state.room.isBossArena && !this.bossState) {
       this.bossState = createBossState();
     }
+    this.state.clouds =
+      this.state.room.isBossArena && this.bossState
+        ? this.bossState.clouds.map((c) => ({ ...c.pos }))
+        : [];
 
     return true;
   }
@@ -479,6 +485,7 @@ export class GameImpl implements Game {
         turnRng,
       );
       this.poisonClouds = this.bossState.clouds;
+      this.state.clouds = this.bossState.clouds.map((c) => ({ ...c.pos }));
 
       if (bossDefeated) {
         // Spawn the Big Cheese near the arena centre.
