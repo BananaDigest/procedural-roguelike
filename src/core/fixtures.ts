@@ -14,7 +14,7 @@ import {
   Room,
   Tile,
   isWalkable,
-} from "./types";
+} from "./types.ts";
 
 /** One representative room: border walls, two shelves, a few of everything. */
 export function fixtureRoom(): Room {
