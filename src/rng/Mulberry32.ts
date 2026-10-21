@@ -36,6 +36,30 @@ export class Mulberry32 {
   chance(p: number): boolean {
     return this.next() < p;
   }
+
+  /**
+   * Weighted pick: higher `weight` → picked more often.
+   * e.g. weighted([{ value: "bread", weight: 30 }, { value: "cheese", weight: 10 }])
+   */
+  weighted<T>(items: readonly { value: T; weight: number }[]): T {
+    let total = 0;
+    for (const it of items) total += it.weight;
+    let roll = this.next() * total;
+    for (const it of items) {
+      roll -= it.weight;
+      if (roll < 0) return it.value;
+    }
+    return items[items.length - 1].value;
+  }
+
+  /** Fisher–Yates shuffle, in place. Returns the same array. */
+  shuffle<T>(arr: T[]): T[] {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = this.int(0, i);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
 }
 
 /** Build a numeric seed from an arbitrary string (e.g. a shared seed code). */
@@ -46,4 +70,35 @@ export function hashSeed(input: string): number {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
+}
+
+/**
+ * Title-screen seed box → numeric seed.
+ *   "8819273" → 8819273 (digits are used as-is, so the HUD shows what you typed)
+ *   "cheese"  → hash of the text
+ *   ""        → null (caller picks a random seed with `randomSeed()`)
+ */
+export function seedFromInput(input: string): number | null {
+  const s = input.trim();
+  if (s === "") return null;
+  if (/^\d+$/.test(s)) return Number(s) % 4294967296;
+  return hashSeed(s);
+}
+
+/**
+ * A fresh random seed for a new run. This is the ONLY place Math.random() is
+ * allowed: it picks *which* world, never *how* the world is built.
+ */
+export function randomSeed(): number {
+  return Math.floor(Math.random() * 1e9);
+}
+
+/** Derived seed of one room: baseSeed + level·100 + roomIndex. */
+export function roomSeed(baseSeed: number, level: number, roomIndex: number): number {
+  return (baseSeed + level * 100 + roomIndex) >>> 0;
+}
+
+/** Derived seed for level-wide decisions (room count). Index 99 never clashes with a room. */
+export function levelSeed(baseSeed: number, level: number): number {
+  return roomSeed(baseSeed, level, 99);
 }

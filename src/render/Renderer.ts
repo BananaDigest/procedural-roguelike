@@ -1,40 +1,22 @@
 /**
- * Renderer — draws the current room of a GameState. Person C's starting point.
- * Ported from the proven canvas preview. Reads GameState only; never mutates it.
- *
+ * Renderer — draws the current room of a GameState. Reads state only.
  * Viewport is fixed (VW×VH tiles); the room is centered, everything else is fog.
+ *
+ * Draw order (per design doc): fog → floor → shelves → room outline →
+ * transitions → traps/poison → food/items → enemies → mouse.
  */
 import {
   EnemyKind,
   FoodKind,
   GameState,
   ItemKind,
-  Room,
   Tile,
 } from "../core/types.ts";
+import { Palette, paletteForLevel } from "./palette.ts";
 
 const T = 28; // tile size, px
 const VW = 20;
 const VH = 14;
-
-interface Palette {
-  floor: string;
-  dot: string;
-  shelf: string;
-  b1: string;
-  b2: string;
-  fog: string;
-  premium: boolean;
-}
-
-const LIGHT: Palette = {
-  floor: "#dfe3e9", dot: "#c7cdd6", shelf: "#7e8694",
-  b1: "#0a4ea2", b2: "#e2231a", fog: "#06070a", premium: false,
-};
-const DARK: Palette = {
-  floor: "#232428", dot: "#2e3036", shelf: "#3a3f48",
-  b1: "#4a4f59", b2: "#d9dde1", fog: "#06070a", premium: true,
-};
 
 const ENEMY_COLOR: Record<EnemyKind, string> = {
   cashier: "#39b3c6",
@@ -42,6 +24,11 @@ const ENEMY_COLOR: Record<EnemyKind, string> = {
   guard: "#2f3e6e",
   boss: "#9b4dca",
 };
+
+export interface DrawOpts {
+  /** skip drawing the mouse this frame (used for the damage-blink effect). */
+  hideMouse?: boolean;
+}
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -54,8 +41,8 @@ export class Renderer {
     this.ctx = ctx;
   }
 
-  draw(state: GameState): void {
-    const p = state.level <= 5 ? LIGHT : DARK;
+  draw(state: GameState, opts: DrawOpts = {}): void {
+    const p = paletteForLevel(state.level);
     const r = state.room;
     const ox = Math.floor((VW - r.w) / 2);
     const oy = Math.floor((VH - r.h) / 2);
@@ -75,17 +62,29 @@ export class Renderer {
       }
     }
 
-    // room outline (alternates colour per room in the chain)
+    // room outline — alternates colour per room in the chain
     ctx.strokeStyle = state.roomIndex % 2 === 0 ? p.b1 : p.b2;
     ctx.lineWidth = 2;
     ctx.strokeRect(ox * T + 1, oy * T + 1, r.w * T - 2, r.h * T - 2);
 
     for (const e of r.exits) this.exit(px(e.pos.x), py(e.pos.y), e.kind);
     for (const t of r.traps) this.trap(px(t.pos.x), py(t.pos.y));
-    for (const f of r.food) this.food(px(f.pos.x), py(f.pos.y), f.kind, p.premium);
+    for (const c of state.clouds) this.poisonCloud(px(c.x), py(c.y));
+    for (const f of r.food) this.food(px(f.pos.x), py(f.pos.y), f.kind);
     for (const it of r.items) this.item(px(it.pos.x), py(it.pos.y), it.kind);
     for (const en of r.enemies) this.enemy(px(en.pos.x), py(en.pos.y), en.kind);
-    this.mouse(px(state.player.pos.x), py(state.player.pos.y));
+    if (!opts.hideMouse) this.mouse(px(state.player.pos.x), py(state.player.pos.y));
+  }
+
+  /** Translucent full-screen flash (red = took damage, white = landed a bite). */
+  flash(alpha: number, color = "#e2231a"): void {
+    if (alpha <= 0) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = Math.min(alpha, 0.6);
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, VW * T, VH * T);
+    ctx.restore();
   }
 
   // --- tiles ---
@@ -163,8 +162,7 @@ export class Renderer {
       ctx.fillStyle = "#d9dde1";
       ctx.beginPath(); ctx.arc(ex + w, cy + T * 0.5, T * 0.05, 0, 7); ctx.fill();
     } else {
-      // boss — mop line
-      ctx.strokeStyle = "#9aa0a6";
+      ctx.strokeStyle = "#9aa0a6"; // boss mop
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(ex + w, ey + 2);
@@ -174,7 +172,7 @@ export class Renderer {
   }
 
   // --- food (all 10 kinds) ---
-  private food(cx: number, cy: number, kind: FoodKind, _premium: boolean) {
+  private food(cx: number, cy: number, kind: FoodKind) {
     const ctx = this.ctx;
     const X = cx + T / 2, Y = cy + T / 2;
     switch (kind) {
@@ -240,7 +238,7 @@ export class Renderer {
       ctx.lineTo(cx + T * 0.55, cy + T * 0.52); ctx.lineTo(cx + T * 0.42, cy + T * 0.72);
       ctx.stroke();
     } else {
-      // bigcheese (goal)
+      // bigcheese (goal) — bigger golden wedge with holes
       ctx.fillStyle = "#f2b705";
       ctx.beginPath(); ctx.moveTo(cx + T * 0.22, cy + T * 0.7); ctx.lineTo(cx + T * 0.78, cy + T * 0.7); ctx.lineTo(cx + T * 0.5, cy + T * 0.24); ctx.closePath(); ctx.fill();
       ctx.fillStyle = "#b5850a";
@@ -258,22 +256,29 @@ export class Renderer {
     ctx.beginPath(); ctx.moveTo(cx + T * 0.5, cy + T * 0.34); ctx.lineTo(cx + T * 0.64, cy + T * 0.62); ctx.lineTo(cx + T * 0.36, cy + T * 0.62); ctx.closePath(); ctx.fill();
   }
 
+  private poisonCloud(cx: number, cy: number) {
+    const ctx = this.ctx;
+    ctx.fillStyle = "rgba(80,200,80,0.45)";
+    ctx.beginPath();
+    ctx.arc(cx + T / 2, cy + T / 2, T * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   private exit(cx: number, cy: number, kind: "nora" | "luk") {
     const ctx = this.ctx;
     const X = cx + T / 2, Y = cy + T / 2;
     if (kind === "nora") {
       ctx.fillStyle = "#000000";
-      ctx.beginPath(); ctx.ellipse(X, Y, T * 0.34, T * 0.22, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(X, Y, T * 0.34, T * 0.22, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,.3)"; ctx.lineWidth = 1; ctx.stroke();
     } else {
       ctx.fillStyle = "#3a3f45";
-      ctx.beginPath(); ctx.arc(X, Y, T * 0.4, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.4, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "#6b7177"; ctx.lineWidth = 1.4;
-      ctx.beginPath(); ctx.arc(X, Y, T * 0.27, 0, 7); ctx.stroke();
-      ctx.beginPath(); ctx.arc(X, Y, T * 0.14, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.27, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.14, 0, Math.PI * 2); ctx.stroke();
     }
   }
 }
 
 export { T as TILE_SIZE, VW as VIEW_W, VH as VIEW_H };
-export type { Room, Palette };
