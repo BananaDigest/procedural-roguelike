@@ -1,8 +1,9 @@
 /**
- * HUD — status line drawn on top of the canvas. Person C extends this.
- * Reads GameState only.
+ * HUD — status line drawn on top of the canvas. Reads GameState only.
+ * All on-screen text is English.
  */
 import { GameState } from "../core/types.ts";
+import { paletteForLevel } from "../render/palette.ts";
 
 export class HUD {
   private ctx: CanvasRenderingContext2D;
@@ -23,9 +24,9 @@ export class HUD {
     ctx.save();
     ctx.font = "12px ui-monospace, Menlo, Consolas, monospace";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.fillStyle = "rgba(0,0,0,.5)";
     ctx.fillRect(0, 0, ctx.canvas.width, 20);
-    ctx.fillStyle = state.level <= 5 ? "#dfe3e9" : "#f2f3f5";
+    ctx.fillStyle = paletteForLevel(state.level).hudText;
     ctx.fillText(text, 8, 5);
     ctx.restore();
   }

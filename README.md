@@ -1,78 +1,69 @@
-# Procedural Roguelike
+# «А Тебе?» — Mouse in the Market
 
-> Make a world from a seed. Press a button. Get a world no one has seen before.
+> A tiny mouse sneaks through 10 shops, room by room, chasing the Big Cheese.
+> Every run is a new market.
 
-A top-down procedural roguelike built with **TypeScript + HTML5 Canvas** (Vite).
-Every run generates a new dungeon; the same seed always rebuilds the same dungeon.
+A turn-based, top-down procedural roguelike. TypeScript + HTML5 Canvas (Vite),
+everything drawn in code — no sprite assets.
 
-**▶ Play:** _add your itch.io / GitHub Pages link here_
+**▶ Play:** https://bananadigest.github.io/procedural-roguelike/
+
+![3 different runs](docs/screenshots/runs.gif)
 
 ## Controls
 
-| Key | Action |
+| Keys | Action |
 | --- | --- |
-| `W A S D` / Arrows | Move |
-| `>` (step on stairs) | Descend to the next floor |
-| `R` | New run with a new seed |
+| `WASD` / arrows / numpad | Move (one tile per press) |
+| `R` | New run |
+| On the title screen | Type a seed (optional) → **Start** |
+
+Bump into an enemy to bite it. Grab snacks for HP + score. Find the нора (hole)
+to the next room, the люк (manhole) to the next shop. Beat the boss on shop 10.
+
+## How generation works
+
+Each room is built from a seeded PRNG (`Mulberry32`) — same seed, same run. A level
+is a chain of 3–7 rooms; you see only the current room (the rest is fog). Full
+write-up and the algorithm diagram: **[docs/GAME_DESIGN.md](docs/GAME_DESIGN.md)**.
+
+## Tech stack
+
+TypeScript · HTML5 Canvas · Vite. No external runtime deps.
 
 ## Run locally
 
 ```bash
 npm install
-npm run dev      # start the dev server (Vite)
-npm run build    # production build into dist/
-npm run preview  # preview the production build
+npm run dev      # http://localhost:5173
+npm run build    # production build → dist/
+npm run preview  # preview the build
 ```
-
-## How generation works
-
-The pipeline, from "press new game" to the first frame:
-
-```
-seed ──► Mulberry32 (seeded PRNG) ──► Drunkard's Walk ──► place spawn
-     ──► flood-fill reachable tiles ──► stairs on farthest reachable tile ──► render
-```
-
-- **`src/rng/Mulberry32.ts`** — the single seeded PRNG. Generation code *never*
-  calls `Math.random()`, so a seed fully determines a floor.
-- **`src/generation/DrunkardsWalk.ts`** — a walker staggers from the center,
-  carving floor. Because it never teleports, the result is always one connected
-  region.
-- **`src/generation/ConnectivityCheck.ts`** — flood fill used to place the
-  staircase only on a tile the player can actually reach (no soft-locks).
-- **`src/game/GameState.ts`** — each floor is generated from a *derived* seed
-  (`runSeed + floor`), so the whole multi-floor run is reproducible.
 
 ## Project structure
 
 ```
 src/
-  main.ts                 # entry: input loop + wiring
-  game/
-    GameState.ts          # the run: seed, floor, player, descend logic
-    Player.ts             # player actor + movement
-    Tile.ts, Level.ts     # grid data model
-    Enemy.ts, Item.ts, Combat.ts   # Week 2 scaffolds
-  generation/
-    DrunkardsWalk.ts      # implemented generator
-    BSP.ts                # scaffold (side quest)
-    ConnectivityCheck.ts  # flood-fill reachability
-  render/
-    Renderer.ts           # canvas tile renderer
-  rng/
-    Mulberry32.ts         # seedable PRNG
-  fov/
-    Shadowcast.ts         # scaffold (fog of war)
-  ui/
-    HUD.ts, Inventory.ts
+  core/      types.ts (shared contract) · fixtures.ts (sample data)
+  generation/  room & level generation            — Person A
+  game/        turn loop, enemies, combat, boss    — Person B
+  render/      Renderer.ts · palette.ts            — Person C
+  ui/          HUD.ts · Screens.ts                 — Person C
+  rng/         Mulberry32.ts (seedable PRNG)
+  main.ts      input + screen flow + wiring        — Person C
+docs/GAME_DESIGN.md   full design (source of truth)
 ```
 
-## Roadmap
+The three systems are decoupled by the `src/core/types.ts` contract
+(`Room`, `GameState`, `GenerateLevel`, `Game`), so each part is developed
+independently against fixtures.
 
-- [x] **Basic** — grid render, movement, drunkard's walk, stairs, multi-floor, seeds
-- [ ] **Standard** — enemies, bump-to-attack combat, HP, items, win condition
-- [ ] **Advanced** — FOV/fog of war, A\* enemies, BSP/WFC, boss, procedural items
+## Who did what
+
+- **Person A** — world generation (rooms, levels, spawns, connectivity)
+- **Person B** — gameplay (turn loop, enemy AI, combat, items, boss)
+- **Person C (Diana)** — rendering, UI/screens, input, delivery
 
 ## License
 
-MIT (or your choice).
+MIT.
