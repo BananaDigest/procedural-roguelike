@@ -1,29 +1,99 @@
 /**
- * Entry point — wires input + Game + Renderer. Person C owns this.
+ * Entry point — screen flow, input, feedback, and wiring. Person C owns this.
  *
- * Right now it runs the StubGame (fixture room) so the project is playable
- * end-to-end from day one. Integration later = swap StubGame for B's real Game,
- * and give B's Game the real `generateLevel` from A. The rest stays.
+ * Runs the StubGame (fixture room) so it's playable end-to-end today.
+ * INTEGRATION: swap `new StubGame()` for B's real Game (constructed with A's
+ * generateLevel). Everything else stays.
  */
 import { StubGame } from "./core/fixtures.ts";
 import { Game } from "./core/types.ts";
 import { Renderer } from "./render/Renderer.ts";
 import { HUD } from "./ui/HUD.ts";
+import { Screens } from "./ui/Screens.ts";
+import { hashSeed } from "./rng/Mulberry32.ts";
+
+/** Flip off to disable the G/H keys that preview the game-over / win screens. */
+const DEV_PREVIEW = true;
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
+const overlay = document.getElementById("overlay") as HTMLElement;
 const renderer = new Renderer(canvas);
 const hud = new HUD(canvas);
+const screens = new Screens(overlay);
 
-// INTEGRATION SEAM: replace with `new GameImpl(generateLevel)` once A & B land.
 const game: Game = new StubGame();
+let started = false;
 
-function frame(): void {
-  renderer.draw(game.state);
+// --- feedback (damage flash + mouse blink) ---
+let flashAlpha = 0;
+let flashColor = "#e2231a";
+let fxFrame = 0;
+
+function render(): void {
+  const blink = flashAlpha > 0 && fxFrame % 2 === 0;
+  renderer.draw(game.state, { hideMouse: blink });
+  renderer.flash(flashAlpha, flashColor);
   hud.draw(game.state);
 }
 
-// Keyed by e.code (physical key) so WASD, arrow keys, and the right-hand numpad
-// all work — numpad is layout- and NumLock-independent this way.
+function fxTick(): void {
+  fxFrame++;
+  flashAlpha = Math.max(0, flashAlpha - 0.05);
+  render();
+  if (flashAlpha > 0) requestAnimationFrame(fxTick);
+}
+
+function triggerFlash(color: string): void {
+  flashColor = color;
+  if (flashAlpha <= 0) {
+    flashAlpha = 0.5;
+    requestAnimationFrame(fxTick);
+  } else {
+    flashAlpha = 0.5;
+  }
+}
+
+// --- seed parsing ---
+function randomSeed(): number {
+  return (Math.floor(Math.random() * 0xffffffff) >>> 0) || 1;
+}
+function parseSeed(raw: string): number {
+  if (!raw) return randomSeed();
+  if (/^\d+$/.test(raw)) return parseInt(raw, 10) >>> 0 || 1;
+  return hashSeed(raw);
+}
+
+// --- screen flow ---
+function showTitle(): void {
+  started = false;
+  screens.title((seed) => startRun(parseSeed(seed)));
+}
+
+function startRun(seed: number): void {
+  game.startWithSeed(seed);
+  started = true;
+  screens.hide();
+  render();
+}
+
+function syncPhase(): void {
+  const s = game.state;
+  if (s.phase === "gameover") screens.gameOver(s.score, () => startRun(randomSeed()));
+  else if (s.phase === "win") screens.win(s.score, s.level, () => startRun(randomSeed()));
+}
+
+function doMove(dx: number, dy: number): void {
+  if (!started || game.state.phase !== "playing") return;
+  const prevHp = game.state.player.hp;
+  const prevEnemies = game.state.room.enemies.length;
+  game.movePlayer(dx, dy);
+  if (game.state.player.hp < prevHp) triggerFlash("#e2231a"); // took damage
+  else if (game.state.room.enemies.length < prevEnemies) triggerFlash("#ffffff"); // landed a bite
+  render();
+  syncPhase();
+}
+
+// --- input (e.code → works with WASD, arrows, and numpad regardless of NumLock) ---
 const MOVES: Record<string, [number, number]> = {
   KeyW: [0, -1], ArrowUp: [0, -1], Numpad8: [0, -1],
   KeyS: [0, 1], ArrowDown: [0, 1], Numpad2: [0, 1],
@@ -33,17 +103,21 @@ const MOVES: Record<string, [number, number]> = {
 
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyR") {
-    game.restart();
-    frame();
+    startRun(randomSeed());
     e.preventDefault();
     return;
   }
+  if (DEV_PREVIEW && started && e.code === "KeyG") {
+    game.state.phase = "gameover"; render(); syncPhase(); return;
+  }
+  if (DEV_PREVIEW && started && e.code === "KeyH") {
+    game.state.phase = "win"; render(); syncPhase(); return;
+  }
   const move = MOVES[e.code];
   if (move) {
-    game.movePlayer(move[0], move[1]);
-    frame();
+    doMove(move[0], move[1]);
     e.preventDefault();
   }
 });
 
-frame();
+showTitle();

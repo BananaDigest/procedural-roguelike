@@ -64,6 +64,7 @@ export function fixtureState(): GameState {
     score: 12,
     player: { pos: { ...room.entry }, hp: 14, maxHp: 20, attack: 4 },
     room,
+    clouds: [{ x: 6, y: 4 }], // sample poison cloud so C can see it rendered
     phase: "playing",
   };
 }

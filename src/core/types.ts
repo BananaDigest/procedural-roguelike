@@ -90,6 +90,8 @@ export interface GameState {
   score: number;
   player: Player;
   room: Room; // the current (visible) room
+  /** Active poison-cloud tiles (boss fight). B fills during the fight; C renders. */
+  clouds: Vec2[];
   phase: Phase;
 }
 
