@@ -1,16 +1,18 @@
 <!doctype html>
-<html lang="uk">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>A Tebe? — Mouse in the Market</title>
+    <title>А Тебе? — Mouse in the Market</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <div id="app">
       <h1>«А Тебе?» <span>— Mouse in the Market</span></h1>
-      <canvas id="game"></canvas>
-      <p class="hint">WASD / arrows / numpad — move · R — new run · (running on a fixture)</p>
+      <div id="stage">
+        <canvas id="game"></canvas>
+        <div id="overlay" hidden></div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
