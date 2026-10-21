@@ -1,17 +1,32 @@
-import { GameState } from "../game/GameState.ts";
+/**
+ * HUD — status line drawn on top of the canvas. Person C extends this.
+ * Reads GameState only.
+ */
+import { GameState } from "../core/types.ts";
 
-/** Syncs the DOM header with the current run state. */
 export class HUD {
-  private floorEl: HTMLElement;
-  private seedEl: HTMLElement;
+  private ctx: CanvasRenderingContext2D;
 
-  constructor() {
-    this.floorEl = document.getElementById("hud-floor")!;
-    this.seedEl = document.getElementById("hud-seed")!;
+  constructor(canvas: HTMLCanvasElement) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("2D canvas context unavailable");
+    this.ctx = ctx;
   }
 
-  update(state: GameState): void {
-    this.floorEl.textContent = `Floor ${state.floorNumber}`;
-    this.seedEl.textContent = `Seed ${state.seed}`;
+  draw(state: GameState): void {
+    const text =
+      `Level ${state.level} · Room ${state.roomIndex + 1}/${state.roomCount}` +
+      `    HP ${state.player.hp}/${state.player.maxHp}` +
+      `    Cheese x${state.score}` +
+      `    Seed ${state.seed}`;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = "12px ui-monospace, Menlo, Consolas, monospace";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.fillRect(0, 0, ctx.canvas.width, 20);
+    ctx.fillStyle = state.level <= 5 ? "#dfe3e9" : "#f2f3f5";
+    ctx.fillText(text, 8, 5);
+    ctx.restore();
   }
 }

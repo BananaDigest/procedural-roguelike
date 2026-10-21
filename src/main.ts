@@ -1,54 +1,49 @@
-import { GameState } from "./game/GameState.ts";
+/**
+ * Entry point — wires input + Game + Renderer. Person C owns this.
+ *
+ * Right now it runs the StubGame (fixture room) so the project is playable
+ * end-to-end from day one. Integration later = swap StubGame for B's real Game,
+ * and give B's Game the real `generateLevel` from A. The rest stays.
+ */
+import { StubGame } from "./core/fixtures.ts";
+import { Game } from "./core/types.ts";
 import { Renderer } from "./render/Renderer.ts";
 import { HUD } from "./ui/HUD.ts";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
-const renderer = new Renderer(canvas, 16);
-const hud = new HUD();
+const renderer = new Renderer(canvas);
+const hud = new HUD(canvas);
 
-// A readable starting seed (you can share it). Replace with a URL param later.
-let state = new GameState(randomSeed());
+// INTEGRATION SEAM: replace with `new GameImpl(generateLevel)` once A & B land.
+const game: Game = new StubGame();
 
-function randomSeed(): number {
-  // Only used to START a run, never inside generation — generation is seeded.
-  return (Math.floor(Math.random() * 0xffffffff) >>> 0) || 1;
+function frame(): void {
+  renderer.draw(game.state);
+  hud.draw(game.state);
 }
 
-function sync(): void {
-  renderer.fit(state.level);
-  renderer.draw(state.level, state.player);
-  hud.update(state);
-}
-
-// --- Input ------------------------------------------------------------------
-
+// Keyed by e.code (physical key) so WASD, arrow keys, and the right-hand numpad
+// all work — numpad is layout- and NumLock-independent this way.
 const MOVES: Record<string, [number, number]> = {
-  ArrowUp: [0, -1],
-  ArrowDown: [0, 1],
-  ArrowLeft: [-1, 0],
-  ArrowRight: [1, 0],
-  w: [0, -1],
-  s: [0, 1],
-  a: [-1, 0],
-  d: [1, 0],
+  KeyW: [0, -1], ArrowUp: [0, -1], Numpad8: [0, -1],
+  KeyS: [0, 1], ArrowDown: [0, 1], Numpad2: [0, 1],
+  KeyA: [-1, 0], ArrowLeft: [-1, 0], Numpad4: [-1, 0],
+  KeyD: [1, 0], ArrowRight: [1, 0], Numpad6: [1, 0],
 };
 
 window.addEventListener("keydown", (e) => {
-  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-
-  if (key === "r") {
-    state.newRun(randomSeed());
-    sync();
+  if (e.code === "KeyR") {
+    game.restart();
+    frame();
     e.preventDefault();
     return;
   }
-
-  const move = MOVES[key];
+  const move = MOVES[e.code];
   if (move) {
-    state.movePlayer(move[0], move[1]);
-    sync();
+    game.movePlayer(move[0], move[1]);
+    frame();
     e.preventDefault();
   }
 });
 
-sync();
+frame();

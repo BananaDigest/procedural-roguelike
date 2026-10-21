@@ -1,80 +1,279 @@
-import { Level } from "../game/Level.ts";
-import { Player } from "../game/Player.ts";
-import { Tile } from "../game/Tile.ts";
+/**
+ * Renderer — draws the current room of a GameState. Person C's starting point.
+ * Ported from the proven canvas preview. Reads GameState only; never mutates it.
+ *
+ * Viewport is fixed (VW×VH tiles); the room is centered, everything else is fog.
+ */
+import {
+  EnemyKind,
+  FoodKind,
+  GameState,
+  ItemKind,
+  Room,
+  Tile,
+} from "../core/types.ts";
 
-const COLORS = {
-  wall: "#20262e",
-  wallEdge: "#2b333d",
-  floor: "#11161b",
-  floorDot: "#1c242c",
-  stairs: "#f4c969",
-  player: "#6cc3ff",
+const T = 28; // tile size, px
+const VW = 20;
+const VH = 14;
+
+interface Palette {
+  floor: string;
+  dot: string;
+  shelf: string;
+  b1: string;
+  b2: string;
+  fog: string;
+  premium: boolean;
+}
+
+const LIGHT: Palette = {
+  floor: "#dfe3e9", dot: "#c7cdd6", shelf: "#7e8694",
+  b1: "#0a4ea2", b2: "#e2231a", fog: "#06070a", premium: false,
+};
+const DARK: Palette = {
+  floor: "#232428", dot: "#2e3036", shelf: "#3a3f48",
+  b1: "#4a4f59", b2: "#d9dde1", fog: "#06070a", premium: true,
 };
 
-/**
- * Draws a Level + Player to a canvas on a fixed tile grid. The canvas is
- * sized to the level so there's no camera to manage yet — add one when
- * maps grow past a screen.
- */
+const ENEMY_COLOR: Record<EnemyKind, string> = {
+  cashier: "#39b3c6",
+  loader: "#e8873b",
+  guard: "#2f3e6e",
+  boss: "#9b4dca",
+};
+
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
-  readonly tileSize: number;
 
-  constructor(
-    private canvas: HTMLCanvasElement,
-    tileSize = 16,
-  ) {
+  constructor(canvas: HTMLCanvasElement) {
+    canvas.width = VW * T;
+    canvas.height = VH * T;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("2D canvas context unavailable");
     this.ctx = ctx;
-    this.tileSize = tileSize;
   }
 
-  /** Resize the canvas backing store to match the level dimensions. */
-  fit(level: Level): void {
-    this.canvas.width = level.width * this.tileSize;
-    this.canvas.height = level.height * this.tileSize;
-  }
+  draw(state: GameState): void {
+    const p = state.level <= 5 ? LIGHT : DARK;
+    const r = state.room;
+    const ox = Math.floor((VW - r.w) / 2);
+    const oy = Math.floor((VH - r.h) / 2);
+    const px = (x: number) => (ox + x) * T;
+    const py = (y: number) => (oy + y) * T;
 
-  draw(level: Level, player: Player): void {
-    const t = this.tileSize;
     const ctx = this.ctx;
+    ctx.fillStyle = p.fog;
+    ctx.fillRect(0, 0, VW * T, VH * T);
 
-    ctx.fillStyle = COLORS.floor;
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    for (let y = 0; y < level.height; y++) {
-      for (let x = 0; x < level.width; x++) {
-        const px = x * t;
-        const py = y * t;
-        const tile = level.get(x, y);
-
-        switch (tile) {
-          case Tile.Wall:
-            ctx.fillStyle = COLORS.wall;
-            ctx.fillRect(px, py, t, t);
-            ctx.fillStyle = COLORS.wallEdge;
-            ctx.fillRect(px, py, t, 2);
-            break;
-          case Tile.Floor:
-            ctx.fillStyle = COLORS.floorDot;
-            ctx.fillRect(px + t / 2 - 1, py + t / 2 - 1, 2, 2);
-            break;
-          case Tile.StairsDown:
-            ctx.fillStyle = COLORS.stairs;
-            ctx.font = `${t}px monospace`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(">", px + t / 2, py + t / 2 + 1);
-            break;
-        }
+    // floor + shelves (walls stay fog)
+    for (let y = 0; y < r.h; y++) {
+      for (let x = 0; x < r.w; x++) {
+        const t = r.tiles[y * r.w + x];
+        if (t === Tile.Floor) this.floorTile(px(x), py(y), p);
+        else if (t === Tile.Shelf) this.shelf(px(x), py(y), p);
       }
     }
 
-    // Player as a filled circle.
-    ctx.fillStyle = COLORS.player;
+    // room outline (alternates colour per room in the chain)
+    ctx.strokeStyle = state.roomIndex % 2 === 0 ? p.b1 : p.b2;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(ox * T + 1, oy * T + 1, r.w * T - 2, r.h * T - 2);
+
+    for (const e of r.exits) this.exit(px(e.pos.x), py(e.pos.y), e.kind);
+    for (const t of r.traps) this.trap(px(t.pos.x), py(t.pos.y));
+    for (const f of r.food) this.food(px(f.pos.x), py(f.pos.y), f.kind, p.premium);
+    for (const it of r.items) this.item(px(it.pos.x), py(it.pos.y), it.kind);
+    for (const en of r.enemies) this.enemy(px(en.pos.x), py(en.pos.y), en.kind);
+    this.mouse(px(state.player.pos.x), py(state.player.pos.y));
+  }
+
+  // --- tiles ---
+  private floorTile(cx: number, cy: number, p: Palette) {
+    this.ctx.fillStyle = p.floor;
+    this.ctx.fillRect(cx, cy, T, T);
+    this.ctx.fillStyle = p.dot;
+    this.ctx.fillRect(cx + T / 2 - 1, cy + T / 2 - 1, 2, 2);
+  }
+  private shelf(cx: number, cy: number, p: Palette) {
+    this.ctx.fillStyle = p.shelf;
+    this.ctx.fillRect(cx + 2, cy + 2, T - 4, T - 4);
+    this.ctx.strokeStyle = "rgba(0,0,0,.25)";
+    this.ctx.lineWidth = 1;
+    this.ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
+  }
+
+  // --- hero ---
+  private mouse(cx: number, cy: number) {
+    const ctx = this.ctx;
+    const bx = cx + T * 0.15, by = cy + T * 0.15, bs = T * 0.7;
+    ctx.fillStyle = "#f5f6f8";
+    ctx.strokeStyle = "#5a5f66";
+    ctx.lineWidth = 1;
+    for (const ex of [bx + 3, bx + bs - 3]) {
+      ctx.beginPath();
+      ctx.moveTo(ex, by);
+      ctx.lineTo(ex - T * 0.11, by - T * 0.14);
+      ctx.lineTo(ex + T * 0.11, by - T * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#f5f6f8";
+    ctx.fillRect(bx, by, bs, bs);
+    ctx.strokeRect(bx + 0.5, by + 0.5, bs - 1, bs - 1);
+    ctx.fillStyle = "#111111";
+    ctx.beginPath(); ctx.arc(cx + T * 0.37, cy + T * 0.44, T * 0.06, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + T * 0.63, cy + T * 0.44, T * 0.06, 0, 7); ctx.fill();
+    ctx.fillStyle = "#ff9ec4";
+    ctx.beginPath(); ctx.arc(cx + T * 0.5, cy + T * 0.62, T * 0.07, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#ff9ec4";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(player.x * t + t / 2, player.y * t + t / 2, t * 0.35, 0, Math.PI * 2);
+    ctx.moveTo(bx + bs, cy + T * 0.7);
+    ctx.quadraticCurveTo(cx + T * 1.02, cy + T * 0.7, cx + T * 0.98, cy + T * 0.4);
+    ctx.stroke();
+  }
+
+  // --- enemies ---
+  private enemy(cx: number, cy: number, kind: EnemyKind) {
+    const ctx = this.ctx;
+    const boss = kind === "boss";
+    const w = T * (boss ? 0.7 : 0.5);
+    const h = T * (boss ? 1.0 : 0.72);
+    const ex = cx + (T - w) / 2;
+    const ey = cy + (T - h) / 2;
+    ctx.fillStyle = ENEMY_COLOR[kind];
+    ctx.beginPath();
+    ctx.roundRect(ex, ey, w, h, [T * 0.18, T * 0.18, T * 0.06, T * 0.06]);
     ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,.35)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = "#111111";
+    ctx.beginPath(); ctx.arc(cx + T * 0.42, ey + h * 0.26, T * 0.05, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + T * 0.58, ey + h * 0.26, T * 0.05, 0, 7); ctx.fill();
+    if (kind === "cashier") {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(cx + T * 0.33, ey + h * 0.62, T * 0.34, T * 0.14);
+    } else if (kind === "loader") {
+      ctx.fillStyle = "#7a4a24";
+      ctx.fillRect(cx + T * 0.4, ey - T * 0.14, T * 0.2, T * 0.16);
+    } else if (kind === "guard") {
+      ctx.fillStyle = "#d9dde1";
+      ctx.beginPath(); ctx.arc(ex + w, cy + T * 0.5, T * 0.05, 0, 7); ctx.fill();
+    } else {
+      // boss — mop line
+      ctx.strokeStyle = "#9aa0a6";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ex + w, ey + 2);
+      ctx.lineTo(ex + w + T * 0.12, ey + h);
+      ctx.stroke();
+    }
+  }
+
+  // --- food (all 10 kinds) ---
+  private food(cx: number, cy: number, kind: FoodKind, _premium: boolean) {
+    const ctx = this.ctx;
+    const X = cx + T / 2, Y = cy + T / 2;
+    switch (kind) {
+      case "cheese":
+        ctx.fillStyle = "#f2c84b";
+        ctx.beginPath(); ctx.moveTo(cx + T * 0.28, cy + T * 0.66); ctx.lineTo(cx + T * 0.72, cy + T * 0.66); ctx.lineTo(cx + T * 0.5, cy + T * 0.3); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#d9a92a";
+        ctx.beginPath(); ctx.arc(X - 2, Y + 3, 1.8, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(X + 3, Y + 1, 1.5, 0, 7); ctx.fill();
+        break;
+      case "croissant":
+        ctx.strokeStyle = "#d9a441"; ctx.lineWidth = T * 0.1; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.arc(X, Y, T * 0.2, Math.PI * 0.25, Math.PI * 1.55); ctx.stroke();
+        ctx.lineCap = "butt";
+        break;
+      case "cookie":
+        ctx.fillStyle = "#b07a3f"; ctx.beginPath(); ctx.arc(X, Y, T * 0.18, 0, 7); ctx.fill();
+        ctx.fillStyle = "#5a3a1a";
+        for (const d of [[-3, -2], [3, -1], [-1, 3]]) { ctx.beginPath(); ctx.arc(X + d[0], Y + d[1], 1.4, 0, 7); ctx.fill(); }
+        break;
+      case "bread":
+        ctx.fillStyle = "#c9975b"; ctx.beginPath(); ctx.roundRect(cx + T * 0.28, cy + T * 0.36, T * 0.44, T * 0.3, T * 0.12); ctx.fill();
+        break;
+      case "sausage":
+        ctx.fillStyle = "#a8503a"; ctx.beginPath(); ctx.roundRect(cx + T * 0.26, cy + T * 0.42, T * 0.48, T * 0.18, T * 0.09); ctx.fill();
+        break;
+      case "cake":
+        ctx.fillStyle = "#f3d9b8"; ctx.beginPath(); ctx.moveTo(cx + T * 0.3, cy + T * 0.68); ctx.lineTo(cx + T * 0.7, cy + T * 0.68); ctx.lineTo(cx + T * 0.5, cy + T * 0.34); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#e2231a"; ctx.beginPath(); ctx.arc(cx + T * 0.5, cy + T * 0.4, 2.2, 0, 7); ctx.fill();
+        break;
+      case "sushi":
+        ctx.fillStyle = "#f5f5f0"; ctx.beginPath(); ctx.roundRect(cx + T * 0.28, cy + T * 0.44, T * 0.44, T * 0.22, T * 0.1); ctx.fill();
+        ctx.fillStyle = "#ff8c66"; ctx.beginPath(); ctx.roundRect(cx + T * 0.28, cy + T * 0.4, T * 0.44, T * 0.1, [T * 0.1, T * 0.1, 0, 0]); ctx.fill();
+        break;
+      case "shrimp":
+        ctx.strokeStyle = "#ff8a5c"; ctx.lineWidth = T * 0.08; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.arc(X, Y, T * 0.17, Math.PI * 0.2, Math.PI * 1.4); ctx.stroke();
+        ctx.lineCap = "butt";
+        break;
+      case "steak":
+        ctx.fillStyle = "#6e3b2a"; ctx.beginPath(); ctx.roundRect(cx + T * 0.26, cy + T * 0.35, T * 0.48, T * 0.32, T * 0.1); ctx.fill();
+        ctx.fillStyle = "#d98a7a"; ctx.beginPath(); ctx.ellipse(X, Y + 1, T * 0.14, T * 0.09, 0, 0, 7); ctx.fill();
+        break;
+      case "chocolate":
+        ctx.fillStyle = "#5a3a24"; ctx.fillRect(cx + T * 0.3, cy + T * 0.33, T * 0.4, T * 0.4);
+        ctx.strokeStyle = "#7a4a2e"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(X, cy + T * 0.33); ctx.lineTo(X, cy + T * 0.73); ctx.moveTo(cx + T * 0.3, Y); ctx.lineTo(cx + T * 0.7, Y); ctx.stroke();
+        break;
+    }
+  }
+
+  // --- items ---
+  private item(cx: number, cy: number, kind: ItemKind) {
+    const ctx = this.ctx;
+    const X = cx + T / 2, Y = cy + T / 2;
+    if (kind === "toothpick") {
+      ctx.strokeStyle = "#b98a5a"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(cx + T * 0.3, cy + T * 0.7); ctx.lineTo(cx + T * 0.7, cy + T * 0.3); ctx.stroke();
+    } else if (kind === "energy") {
+      ctx.strokeStyle = "#ffd84d"; ctx.lineWidth = 2; ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx + T * 0.55, cy + T * 0.28); ctx.lineTo(cx + T * 0.4, cy + T * 0.52);
+      ctx.lineTo(cx + T * 0.55, cy + T * 0.52); ctx.lineTo(cx + T * 0.42, cy + T * 0.72);
+      ctx.stroke();
+    } else {
+      // bigcheese (goal)
+      ctx.fillStyle = "#f2b705";
+      ctx.beginPath(); ctx.moveTo(cx + T * 0.22, cy + T * 0.7); ctx.lineTo(cx + T * 0.78, cy + T * 0.7); ctx.lineTo(cx + T * 0.5, cy + T * 0.24); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#b5850a";
+      ctx.beginPath(); ctx.arc(X - 4, Y + 6, 2, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(X + 4, Y + 3, 2, 0, 7); ctx.fill();
+    }
+  }
+
+  // --- hazards & exits ---
+  private trap(cx: number, cy: number) {
+    const ctx = this.ctx;
+    ctx.fillStyle = "#7a5230";
+    ctx.fillRect(cx + T * 0.28, cy + T * 0.28, T * 0.44, T * 0.44);
+    ctx.fillStyle = "#e2231a";
+    ctx.beginPath(); ctx.moveTo(cx + T * 0.5, cy + T * 0.34); ctx.lineTo(cx + T * 0.64, cy + T * 0.62); ctx.lineTo(cx + T * 0.36, cy + T * 0.62); ctx.closePath(); ctx.fill();
+  }
+
+  private exit(cx: number, cy: number, kind: "nora" | "luk") {
+    const ctx = this.ctx;
+    const X = cx + T / 2, Y = cy + T / 2;
+    if (kind === "nora") {
+      ctx.fillStyle = "#000000";
+      ctx.beginPath(); ctx.ellipse(X, Y, T * 0.34, T * 0.22, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.3)"; ctx.lineWidth = 1; ctx.stroke();
+    } else {
+      ctx.fillStyle = "#3a3f45";
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.4, 0, 7); ctx.fill();
+      ctx.strokeStyle = "#6b7177"; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.27, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.14, 0, 7); ctx.stroke();
+    }
   }
 }
+
+export { T as TILE_SIZE, VW as VIEW_W, VH as VIEW_H };
+export type { Room, Palette };
