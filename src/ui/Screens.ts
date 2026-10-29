@@ -37,6 +37,41 @@ export class Screens {
     ]);
   }
 
+  /**
+   * DEBUG «go to level» box. `onGo` gets the raw input and returns an error
+   * message to show (box stays open), or null on success (caller closes it).
+   * Esc is handled by the caller's global key handler.
+   */
+  levelSelect(current: number, onGo: (raw: string) => string | null): void {
+    const error = this.p("", "error");
+    error.setAttribute("role", "alert");
+    const row = document.createElement("div");
+    row.className = "seed-row";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "level 1–10";
+    input.inputMode = "numeric";
+    input.value = String(current);
+    const go = () => {
+      error.textContent = onGo(input.value.trim()) ?? "";
+      input.select();
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") go();
+    });
+    row.appendChild(input);
+    row.appendChild(this.button("Go", go));
+
+    this.panel([
+      this.h("Go to level"),
+      this.p("Debug · Enter — go · Esc — cancel"),
+      row,
+      error,
+    ]);
+    input.focus();
+    input.select();
+  }
+
   // --- helpers ---
   private panel(children: HTMLElement[]): void {
     this.el.hidden = false;

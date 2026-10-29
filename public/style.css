@@ -106,6 +106,10 @@ h1 span {
   color: var(--text);
   font-size: 15px;
 }
+.screen-card p.error {
+  color: #ff6b6b;
+  min-height: 1.4em; /* reserve the line so the box doesn't jump */
+}
 
 .seed-row {
   display: flex;

@@ -22,3 +22,8 @@ export const ROOM_SCALE = { factor: 1.25, fromLevel: 6, toLevel: 10 };
 
 /** Never shrink the game below this window scale (tiny browser windows scroll instead). */
 export const MIN_WINDOW_SCALE = 0.5;
+
+/** DEBUG: hotkey opens a «go to level 1–10» box (testing / demos). Set false before release. */
+export const DEBUG_LEVEL_SELECT = true;
+/** KeyboardEvent.code of that hotkey (` — the key left of 1). */
+export const DEBUG_LEVEL_SELECT_KEY = "Backquote";
