@@ -20,6 +20,7 @@ const overlay = document.getElementById("overlay") as HTMLElement;
 const renderer = new Renderer(canvas);
 const hud = new HUD(canvas);
 const screens = new Screens(overlay);
+const stage = document.getElementById("stage") as HTMLElement;
 
 const game: Game = new GameImpl(generateLevel);
 let started = false;
@@ -62,6 +63,20 @@ function parseSeed(raw: string): number {
   if (/^\d+$/.test(raw)) return parseInt(raw, 10) >>> 0 || 1;
   return hashSeed(raw);
 }
+
+// --- window fit: canvas + overlay scale with the browser window ---
+const PAD_X = 16; // #app padding in style.css: 24px 16px
+const PAD_Y = 24;
+
+function fitToWindow(): void {
+  const top = stage.getBoundingClientRect().top + window.scrollY;
+  const scale = renderer.fit(window.innerWidth - 2 * PAD_X, window.innerHeight - top - PAD_Y);
+  stage.style.setProperty("--ui-scale", String(scale));
+  if (started) render();
+}
+
+window.addEventListener("resize", fitToWindow);
+fitToWindow();
 
 // --- screen flow ---
 function showTitle(): void {
