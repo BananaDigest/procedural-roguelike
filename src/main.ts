@@ -4,7 +4,6 @@
  * Integrated build: real game logic (B's GameImpl) driven by the real world
  * generator (A's generateLevel), rendered by C's Renderer/HUD/Screens.
  */
-import { Game } from "./core/types.ts";
 import { GameImpl } from "./game/GameImpl.ts";
 import { generateLevel } from "./generation/LevelChain.ts";
 import { Renderer } from "./render/Renderer.ts";
@@ -12,6 +11,7 @@ import { HUD } from "./ui/HUD.ts";
 import { Minimap } from "./ui/Minimap.ts";
 import { Screens } from "./ui/Screens.ts";
 import { hashSeed } from "./rng/Mulberry32.ts";
+import { DEBUG_LEVEL_SELECT, DEBUG_LEVEL_SELECT_KEY } from "./config.ts";
 
 /** Flip off to disable the G/H keys that preview the game-over / win screens. */
 const DEV_PREVIEW = true;
@@ -25,8 +25,10 @@ const minimap = new Minimap(minimapCanvas); // fixed radar, top-right of the scr
 const screens = new Screens(overlay);
 const stage = document.getElementById("stage") as HTMLElement;
 
-const game: Game = new GameImpl(generateLevel);
+const game = new GameImpl(generateLevel);
 let started = false;
+/** DEBUG level-select box is open → game is paused, keys don't move the mouse. */
+let levelSelectOpen = false;
 let showMap = true;
 
 // --- feedback (damage flash + mouse blink) ---
@@ -118,6 +120,25 @@ function doMove(dx: number, dy: number): void {
   syncPhase();
 }
 
+// --- DEBUG: go to level (config.DEBUG_LEVEL_SELECT) ---
+function openLevelSelect(): void {
+  levelSelectOpen = true;
+  screens.levelSelect(game.state.level, (raw) => {
+    if (!/^\d+$/.test(raw)) return "Enter a number from 1 to 10";
+    const level = Number(raw);
+    if (level < 1 || level > 10) return "Level must be 1–10";
+    if (!game.jumpToLevel(level)) return "Can't change level right now";
+    closeLevelSelect();
+    return null;
+  });
+}
+
+function closeLevelSelect(): void {
+  levelSelectOpen = false;
+  screens.hide();
+  render();
+}
+
 // --- input (e.code → works with WASD, arrows, and numpad regardless of NumLock) ---
 const MOVES: Record<string, [number, number]> = {
   KeyW: [0, -1], ArrowUp: [0, -1], Numpad8: [0, -1],
@@ -127,6 +148,20 @@ const MOVES: Record<string, [number, number]> = {
 };
 
 window.addEventListener("keydown", (e) => {
+  // While the level box is open the game is paused: only Esc reaches us here,
+  // everything else (digits, Enter) belongs to the box's input.
+  if (levelSelectOpen) {
+    if (e.code === "Escape") {
+      closeLevelSelect();
+      e.preventDefault();
+    }
+    return;
+  }
+  if (DEBUG_LEVEL_SELECT && started && game.state.phase === "playing" && e.code === DEBUG_LEVEL_SELECT_KEY) {
+    openLevelSelect();
+    e.preventDefault(); // don't type ` into the box
+    return;
+  }
   if (e.code === "KeyR") {
     startRun(randomSeed());
     e.preventDefault();

@@ -374,6 +374,29 @@ export class GameImpl implements Game {
       if (!this.transitionLuk(exit.dir)) return false;
     }
 
+    this.afterTransition();
+    return true;
+  }
+
+  /**
+   * DEBUG: jump straight to the start of `level` (1..TOTAL_LEVELS) — the
+   * same path as walking through a люк forward: current room is saved,
+   * the level is generated (or loaded from memory), player lands at its start.
+   *
+   * @returns `false` if not playing or `level` is out of range.
+   */
+  jumpToLevel(level: number): boolean {
+    if (this.state.phase !== "playing") return false;
+    if (!Number.isInteger(level) || level < 1 || level > TOTAL_LEVELS) return false;
+
+    this.saveCurrentRoom();
+    this.enterLevel(level, "fwd");
+    this.afterTransition();
+    return true;
+  }
+
+  /** Shared tail of every room/level change: boss state, clouds, flies. */
+  private afterTransition(): void {
     // Entering a boss arena?
     if (this.state.room.isBossArena && !this.bossState) {
       this.bossState = createBossState();
@@ -426,6 +449,18 @@ export class GameImpl implements Game {
 
     if (newLevel < 1 || newLevel > TOTAL_LEVELS) return false;
 
+    this.enterLevel(newLevel, dir);
+    return true;
+  }
+
+  /**
+   * Move the player into `newLevel`: generate/load its room chain and place
+   * the player at the arrival point.
+   *
+   * @param dir - `"fwd"` arrives at the level's start (room 0),
+   *   `"back"` at its end (last room).
+   */
+  private enterLevel(newLevel: number, dir: "fwd" | "back"): void {
     const chain = this.getOrGenerateChain(this.state.seed, newLevel);
     const newIndex = dir === "fwd" ? 0 : chain.length - 1;
     const newRoom = this.loadRoom(newLevel, newIndex);
@@ -458,8 +493,6 @@ export class GameImpl implements Game {
     if (newLevel === TOTAL_LEVELS && newRoom.isBossArena) {
       this.bossState = createBossState();
     }
-
-    return true;
   }
 
   /**
