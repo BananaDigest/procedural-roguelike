@@ -10,10 +10,13 @@
     <div id="app">
       <h1>«А Тебе?» <span>— Mouse in the Market</span></h1>
       <div id="stage">
-        <canvas id="game"></canvas>
-        <div id="overlay" hidden></div>
+        <div id="game-wrap">
+          <canvas id="game"></canvas>
+          <div id="overlay" hidden></div>
+        </div>
       </div>
     </div>
+    <canvas id="minimap" hidden></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
