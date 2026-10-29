@@ -410,6 +410,8 @@ export class GameImpl implements Game {
     if (this.state.flies.length > 0) {
       repositionFlies(this.state.flies, this.state.player.pos, this.state.room);
     }
+
+    return true;
   }
 
   /**
