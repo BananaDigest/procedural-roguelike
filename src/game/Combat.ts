@@ -99,6 +99,49 @@ export function enemyAttackPlayer(enemy: Enemy, player: Player): void {
  * @param fly   - The fly companion being hit (mutated: `hp` is reduced).
  * @returns `true` if the fly died (hp <= 0).
  */
+/**
+ * Living Shield: An enemy attempts to attack the player.
+ * If the player has any living fly companions, one of the flies absorbs
+ * the attack and takes the damage instead of the player (player takes 0 damage).
+ * If no flies are alive, the player takes the damage normally.
+ *
+ * @param enemy  - The attacking enemy.
+ * @param player - The player.
+ * @param flies  - Optional active fly companions.
+ * @returns The fly that took the hit as a shield, or null if player was damaged.
+ */
+export function enemyAttackWithShield(
+  enemy: Enemy,
+  player: Player,
+  flies?: Fly[],
+): Fly | null {
+  if (flies && flies.length > 0) {
+    const aliveFlies = flies.filter((f) => f.hp > 0);
+    if (aliveFlies.length > 0) {
+      let shieldFly = aliveFlies[0];
+      let bestDist =
+        Math.abs(shieldFly.pos.x - enemy.pos.x) +
+        Math.abs(shieldFly.pos.y - enemy.pos.y);
+
+      for (let i = 1; i < aliveFlies.length; i++) {
+        const f = aliveFlies[i];
+        const dist =
+          Math.abs(f.pos.x - enemy.pos.x) + Math.abs(f.pos.y - enemy.pos.y);
+        if (dist < bestDist) {
+          bestDist = dist;
+          shieldFly = f;
+        }
+      }
+
+      enemyAttackFly(enemy, shieldFly);
+      return shieldFly;
+    }
+  }
+
+  enemyAttackPlayer(enemy, player);
+  return null;
+}
+
 export function enemyAttackFly(enemy: Enemy, fly: Fly): boolean {
   const dmg = enemyAttackDamage(enemy.kind);
   fly.hp = Math.max(0, fly.hp - dmg);

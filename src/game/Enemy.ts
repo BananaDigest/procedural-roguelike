@@ -21,7 +21,7 @@
 
 import { Room, Enemy, Vec2, Player, Fly, isWalkable } from "../core/types.ts";
 import { Mulberry32 } from "../rng/Mulberry32.ts";
-import { enemyAttackPlayer, enemyAttackFly } from "./Combat.ts";
+import { enemyAttackDamage, enemyAttackFly, enemyAttackWithShield } from "./Combat.ts";
 
 // ── Geometry helpers ─────────────────────────────────────────────────────────
 
@@ -97,7 +97,8 @@ function getValidMoves(
     if (
       isWalkable(room, nx, ny) &&
       isFreeOfEnemies(nx, ny, enemies, enemy) &&
-      (nx !== playerPos.x || ny !== playerPos.y)
+      (nx !== playerPos.x || ny !== playerPos.y) &&
+      (!room.dementedMouse || room.dementedMouse.hp <= 0 || nx !== room.dementedMouse.pos.x || ny !== room.dementedMouse.pos.y)
     ) {
       result.push({ x: nx, y: ny });
     }
@@ -193,7 +194,7 @@ function stepEnemy(
 ): boolean {
   // Adjacent → melee attack instead of moving.
   if (isAdjacent(enemy.pos, player.pos)) {
-    enemyAttackPlayer(enemy, player);
+    enemyAttackWithShield(enemy, player, flies);
     return true;
   }
 
@@ -206,6 +207,22 @@ function stepEnemy(
       enemyAttackFly(enemy, targetFly);
       return true;
     }
+  }
+
+  // Adjacent to demented mouse teammate → attack the demented mouse!
+  if (
+    room.dementedMouse &&
+    room.dementedMouse.hp > 0 &&
+    isAdjacent(enemy.pos, room.dementedMouse.pos)
+  ) {
+    room.dementedMouse.hp = Math.max(
+      0,
+      room.dementedMouse.hp - enemyAttackDamage(enemy.kind),
+    );
+    if (room.dementedMouse.hp <= 0) {
+      room.dementedMouse = null;
+    }
+    return true;
   }
 
   // Move according to behaviour kind.
