@@ -52,9 +52,11 @@ import { processEnemyTurns } from "./Enemy.ts";
 import {
   BossState,
   createBossState,
+  findBoss,
   processBossTurn,
   PoisonCloud,
 } from "./Boss.ts";
+import { CHEESE_BONUS_DIVIDER } from "../config.ts";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -102,6 +104,11 @@ export class GameImpl implements Game {
 
   /** `true` after the player picks up the Toothpick weapon (permanent). */
   hasToothpick = false;
+
+  /** Cheese-power bonus granted on reaching the boss (0 = none yet / too little cheese). */
+  cheeseBonus = 0;
+  /** True once the player has reached the boss this run — the bonus is rolled only then. */
+  cheeseBonusApplied = false;
 
   /** Turns remaining on the Energy Drink freeze effect. */
   energyTurnsLeft = 0;
@@ -256,6 +263,8 @@ export class GameImpl implements Game {
     this.visitedRooms.clear();
     this.levelChains.clear();
     this.hasToothpick = false;
+    this.cheeseBonus = 0;
+    this.cheeseBonusApplied = false;
     this.energyTurnsLeft = 0;
     this.bossState = null;
     this.poisonClouds = [];
@@ -338,7 +347,8 @@ export class GameImpl implements Game {
       switch (item.kind) {
         case "toothpick":
           this.hasToothpick = true;
-          player.attack = PLAYER_BASE_ATTACK + TOOTHPICK_ATTACK_BONUS;
+          // keep the cheese-power bonus if it was already granted
+          player.attack = PLAYER_BASE_ATTACK + TOOTHPICK_ATTACK_BONUS + this.cheeseBonus;
           break;
         case "energy":
           this.energyTurnsLeft = ENERGY_DRINK_TURNS;
@@ -401,10 +411,72 @@ export class GameImpl implements Game {
       if (!this.transitionLuk(exit.dir)) return false;
     }
 
+    this.afterTransition();
+    return true;
+  }
+
+  /**
+   * DEBUG: jump straight to the start of `level` (1..TOTAL_LEVELS) — the
+   * same path as walking through a люк forward: current room is saved,
+   * the level is generated (or loaded from memory), player lands at its start.
+   *
+   * @returns `false` if not playing or `level` is out of range.
+   */
+  jumpToLevel(level: number): boolean {
+    if (this.state.phase !== "playing") return false;
+    if (!Number.isInteger(level) || level < 1 || level > TOTAL_LEVELS) return false;
+
+    this.saveCurrentRoom();
+    this.enterLevel(level, "fwd");
+    this.afterTransition();
+    return true;
+  }
+
+  /**
+   * DEBUG: instantly kill the Cleaning Lady. Works only while the player is
+   * in the level-10 arena with the boss alive. Goes through the same path as
+   * a killing bite (remove the dead enemy → turn passes → boss turn sees her
+   * gone → Big Cheese spawns), so victory works exactly as in normal play.
+   *
+   * @returns `true` if the boss was killed.
+   */
+  debugKillBoss(): boolean {
+    const { room } = this.state;
+    if (this.state.phase !== "playing" || this.state.level !== TOTAL_LEVELS) return false;
+    if (!room.isBossArena) return false;
+    const boss = findBoss(room);
+    if (!boss) return false;
+
+    boss.hp = 0;
+    removeDeadEnemies(room);
+    this.postPlayerAction();
+    return true;
+  }
+
+  /**
+   * Cheese power — on first reaching the boss: +floor(cheese / divider) to
+   * damage, HP and maxHp. Cheese itself is not spent. Once per run.
+   */
+  private applyCheeseBonus(): void {
+    if (this.cheeseBonusApplied) return;
+    this.cheeseBonusApplied = true;
+
+    const bonus = Math.floor(this.state.score / CHEESE_BONUS_DIVIDER);
+    if (bonus <= 0) return;
+    const { player } = this.state;
+    this.cheeseBonus = bonus;
+    player.attack += bonus;
+    player.maxHp += bonus;
+    player.hp += bonus;
+  }
+
+  /** Shared tail of every room/level change: boss state, clouds, flies. */
+  private afterTransition(): void {
     // Entering a boss arena?
     if (this.state.room.isBossArena && !this.bossState) {
       this.bossState = createBossState();
     }
+    if (this.state.room.isBossArena) this.applyCheeseBonus();
     this.state.clouds =
       this.state.room.isBossArena && this.bossState
         ? this.bossState.clouds.map((c) => ({ ...c.pos }))
@@ -414,8 +486,6 @@ export class GameImpl implements Game {
     if (this.state.flies.length > 0) {
       repositionFlies(this.state.flies, this.state.player.pos, this.state.room, this.state.room.enemies);
     }
-
-    return true;
   }
 
   /**
@@ -453,6 +523,18 @@ export class GameImpl implements Game {
 
     if (newLevel < 1 || newLevel > TOTAL_LEVELS) return false;
 
+    this.enterLevel(newLevel, dir);
+    return true;
+  }
+
+  /**
+   * Move the player into `newLevel`: generate/load its room chain and place
+   * the player at the arrival point.
+   *
+   * @param dir - `"fwd"` arrives at the level's start (room 0),
+   *   `"back"` at its end (last room).
+   */
+  private enterLevel(newLevel: number, dir: "fwd" | "back"): void {
     const chain = this.getOrGenerateChain(this.state.seed, newLevel);
     const newIndex = dir === "fwd" ? 0 : chain.length - 1;
     const newRoom = this.loadRoom(newLevel, newIndex);
@@ -489,8 +571,6 @@ export class GameImpl implements Game {
     if (newLevel === TOTAL_LEVELS && newRoom.isBossArena) {
       this.bossState = createBossState();
     }
-
-    return true;
   }
 
   /**

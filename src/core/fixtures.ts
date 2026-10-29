@@ -41,8 +41,8 @@ export function fixtureRoom(): Room {
     entry: { x: 2, y: 5 },
     exits: [{ kind: "nora", dir: "fwd", pos: { x: 11, y: 4 } }],
     enemies: [
-      { kind: "cashier", pos: { x: 7, y: 3 }, hp: 4, fast: false },
-      { kind: "guard", pos: { x: 9, y: 7 }, hp: 8, fast: false },
+      { kind: "cashier", pos: { x: 7, y: 3 }, hp: 4, maxHp: 4, fast: false },
+      { kind: "guard", pos: { x: 9, y: 7 }, hp: 8, maxHp: 8, fast: false },
     ],
     food: [
       { kind: "cheese", pos: { x: 5, y: 7 }, heal: 3, score: 10 },

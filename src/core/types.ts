@@ -29,6 +29,8 @@ export interface Enemy {
   kind: EnemyKind;
   pos: Vec2;
   hp: number;
+  /** HP at spawn — the health bar shows hp / maxHp. */
+  maxHp: number;
   /** true = moves 2 tiles per player turn (levels 8+). */
   fast: boolean;
 }

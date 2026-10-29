@@ -4,14 +4,15 @@
  * Integrated build: real game logic (B's GameImpl) driven by the real world
  * generator (A's generateLevel), rendered by C's Renderer/HUD/Screens.
  */
-import { Game } from "./core/types.ts";
 import { GameImpl } from "./game/GameImpl.ts";
 import { generateLevel } from "./generation/LevelChain.ts";
 import { Renderer } from "./render/Renderer.ts";
 import { HUD } from "./ui/HUD.ts";
 import { Minimap } from "./ui/Minimap.ts";
 import { Screens } from "./ui/Screens.ts";
+import { Toast } from "./ui/Toast.ts";
 import { hashSeed } from "./rng/Mulberry32.ts";
+import { DEBUG_KILL_BOSS_KEY, DEBUG_LEVEL_SELECT, DEBUG_LEVEL_SELECT_KEY } from "./config.ts";
 
 /** Flip off to disable the G/H keys that preview the game-over / win screens. */
 const DEV_PREVIEW = true;
@@ -24,9 +25,12 @@ const minimapCanvas = document.getElementById("minimap") as HTMLCanvasElement;
 const minimap = new Minimap(minimapCanvas); // fixed radar, top-right of the screen
 const screens = new Screens(overlay);
 const stage = document.getElementById("stage") as HTMLElement;
+const toast = new Toast(document.getElementById("game-wrap") as HTMLElement);
 
-const game: Game = new GameImpl(generateLevel);
+const game = new GameImpl(generateLevel);
 let started = false;
+/** DEBUG level-select box is open → game is paused, keys don't move the mouse. */
+let levelSelectOpen = false;
 let showMap = true;
 
 // --- feedback (damage flash + mouse blink) ---
@@ -103,8 +107,16 @@ function syncPhase(): void {
   else if (s.phase === "win") screens.win(s.score, s.level, () => startRun(randomSeed()));
 }
 
+/** Show «Cheese power!» the moment the bonus is granted (called after any action). */
+function announceCheeseBonus(wasApplied: boolean): void {
+  if (wasApplied || !game.cheeseBonusApplied || game.cheeseBonus <= 0) return;
+  const b = game.cheeseBonus;
+  toast.show("Cheese power!", `+${b} damage, +${b} HP`);
+}
+
 function doMove(dx: number, dy: number): void {
   if (!started || game.state.phase !== "playing") return;
+  const hadBonus = game.cheeseBonusApplied;
   const prevHp = game.state.player.hp;
   const prevRoom = game.state.room;
   const prevEnemies = prevRoom.enemies.length;
@@ -115,7 +127,27 @@ function doMove(dx: number, dy: number): void {
     triggerFlash("#ffffff"); // landed a bite (same room → an enemy died)
   }
   render();
+  announceCheeseBonus(hadBonus);
   syncPhase();
+}
+
+// --- DEBUG: go to level (config.DEBUG_LEVEL_SELECT) ---
+function openLevelSelect(): void {
+  levelSelectOpen = true;
+  screens.levelSelect(game.state.level, (raw) => {
+    if (!/^\d+$/.test(raw)) return "Enter a number from 1 to 10";
+    const level = Number(raw);
+    if (level < 1 || level > 10) return "Level must be 1–10";
+    if (!game.jumpToLevel(level)) return "Can't change level right now";
+    closeLevelSelect();
+    return null;
+  });
+}
+
+function closeLevelSelect(): void {
+  levelSelectOpen = false;
+  screens.hide();
+  render();
 }
 
 // --- input (e.code → works with WASD, arrows, and numpad regardless of NumLock) ---
@@ -127,6 +159,30 @@ const MOVES: Record<string, [number, number]> = {
 };
 
 window.addEventListener("keydown", (e) => {
+  // While the level box is open the game is paused: only Esc reaches us here,
+  // everything else (digits, Enter) belongs to the box's input.
+  if (levelSelectOpen) {
+    if (e.code === "Escape") {
+      closeLevelSelect();
+      e.preventDefault();
+    }
+    return;
+  }
+  if (DEBUG_LEVEL_SELECT && started && game.state.phase === "playing" && e.code === DEBUG_LEVEL_SELECT_KEY) {
+    openLevelSelect();
+    e.preventDefault(); // don't type ` into the box
+    return;
+  }
+  // DEBUG: K kills the boss (level-10 arena only) — same feedback as a killing bite.
+  if (DEBUG_LEVEL_SELECT && started && e.code === DEBUG_KILL_BOSS_KEY) {
+    if (game.debugKillBoss()) {
+      triggerFlash("#ffffff");
+      render();
+      syncPhase();
+    }
+    e.preventDefault();
+    return;
+  }
   if (e.code === "KeyR") {
     startRun(randomSeed());
     e.preventDefault();
