@@ -148,3 +148,60 @@ h1 span {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* --- polished title screen --- */
+.screen-card {
+  background: rgba(13, 15, 20, 0.72);
+  border: 1px solid rgba(90, 160, 255, 0.18);
+  border-radius: 16px;
+  box-shadow: 0 24px 70px -28px rgba(0, 0, 0, 0.85);
+  animation: card-in 0.28s ease-out both;
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px) scale(var(--ui-scale, 1)); }
+  to   { opacity: 1; transform: scale(var(--ui-scale, 1)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen-card { animation: none; }
+}
+
+.screen-card h2.brand {
+  font-size: 34px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 22px rgba(90, 160, 255, 0.35);
+}
+
+.title-art {
+  display: block;
+  margin: 0 auto 2px;
+  max-width: 100%;
+  height: auto;
+}
+
+.keys {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2px;
+}
+.key-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.key-chip kbd {
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text);
+  background: #1b1f27;
+  border: 1px solid #2c323d;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 3px 7px;
+}
+.key-label {
+  color: var(--muted);
+  font-size: 12px;
+}
