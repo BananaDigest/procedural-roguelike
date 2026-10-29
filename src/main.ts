@@ -10,6 +10,7 @@ import { Renderer } from "./render/Renderer.ts";
 import { HUD } from "./ui/HUD.ts";
 import { Minimap } from "./ui/Minimap.ts";
 import { Screens } from "./ui/Screens.ts";
+import { Toast } from "./ui/Toast.ts";
 import { hashSeed } from "./rng/Mulberry32.ts";
 import { DEBUG_KILL_BOSS_KEY, DEBUG_LEVEL_SELECT, DEBUG_LEVEL_SELECT_KEY } from "./config.ts";
 
@@ -24,6 +25,7 @@ const minimapCanvas = document.getElementById("minimap") as HTMLCanvasElement;
 const minimap = new Minimap(minimapCanvas); // fixed radar, top-right of the screen
 const screens = new Screens(overlay);
 const stage = document.getElementById("stage") as HTMLElement;
+const toast = new Toast(document.getElementById("game-wrap") as HTMLElement);
 
 const game = new GameImpl(generateLevel);
 let started = false;
@@ -105,8 +107,16 @@ function syncPhase(): void {
   else if (s.phase === "win") screens.win(s.score, s.level, () => startRun(randomSeed()));
 }
 
+/** Show «Cheese power!» the moment the bonus is granted (called after any action). */
+function announceCheeseBonus(wasApplied: boolean): void {
+  if (wasApplied || !game.cheeseBonusApplied || game.cheeseBonus <= 0) return;
+  const b = game.cheeseBonus;
+  toast.show("Cheese power!", `+${b} damage, +${b} HP`);
+}
+
 function doMove(dx: number, dy: number): void {
   if (!started || game.state.phase !== "playing") return;
+  const hadBonus = game.cheeseBonusApplied;
   const prevHp = game.state.player.hp;
   const prevRoom = game.state.room;
   const prevEnemies = prevRoom.enemies.length;
@@ -117,6 +127,7 @@ function doMove(dx: number, dy: number): void {
     triggerFlash("#ffffff"); // landed a bite (same room → an enemy died)
   }
   render();
+  announceCheeseBonus(hadBonus);
   syncPhase();
 }
 

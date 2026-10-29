@@ -53,6 +53,7 @@ import {
   processBossTurn,
   PoisonCloud,
 } from "./Boss.ts";
+import { CHEESE_BONUS_DIVIDER } from "../config.ts";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -97,6 +98,11 @@ export class GameImpl implements Game {
 
   /** `true` after the player picks up the Toothpick weapon (permanent). */
   hasToothpick = false;
+
+  /** Cheese-power bonus granted on reaching the boss (0 = none yet / too little cheese). */
+  cheeseBonus = 0;
+  /** True once the player has reached the boss this run — the bonus is rolled only then. */
+  cheeseBonusApplied = false;
 
   /** Turns remaining on the Energy Drink freeze effect. */
   energyTurnsLeft = 0;
@@ -236,6 +242,8 @@ export class GameImpl implements Game {
     this.visitedRooms.clear();
     this.levelChains.clear();
     this.hasToothpick = false;
+    this.cheeseBonus = 0;
+    this.cheeseBonusApplied = false;
     this.energyTurnsLeft = 0;
     this.bossState = null;
     this.poisonClouds = [];
@@ -318,7 +326,8 @@ export class GameImpl implements Game {
       switch (item.kind) {
         case "toothpick":
           this.hasToothpick = true;
-          player.attack = PLAYER_BASE_ATTACK + TOOTHPICK_ATTACK_BONUS;
+          // keep the cheese-power bonus if it was already granted
+          player.attack = PLAYER_BASE_ATTACK + TOOTHPICK_ATTACK_BONUS + this.cheeseBonus;
           break;
         case "energy":
           this.energyTurnsLeft = ENERGY_DRINK_TURNS;
@@ -417,12 +426,30 @@ export class GameImpl implements Game {
     return true;
   }
 
+  /**
+   * Cheese power — on first reaching the boss: +floor(cheese / divider) to
+   * damage, HP and maxHp. Cheese itself is not spent. Once per run.
+   */
+  private applyCheeseBonus(): void {
+    if (this.cheeseBonusApplied) return;
+    this.cheeseBonusApplied = true;
+
+    const bonus = Math.floor(this.state.score / CHEESE_BONUS_DIVIDER);
+    if (bonus <= 0) return;
+    const { player } = this.state;
+    this.cheeseBonus = bonus;
+    player.attack += bonus;
+    player.maxHp += bonus;
+    player.hp += bonus;
+  }
+
   /** Shared tail of every room/level change: boss state, clouds, flies. */
   private afterTransition(): void {
     // Entering a boss arena?
     if (this.state.room.isBossArena && !this.bossState) {
       this.bossState = createBossState();
     }
+    if (this.state.room.isBossArena) this.applyCheeseBonus();
     this.state.clouds =
       this.state.room.isBossArena && this.bossState
         ? this.bossState.clouds.map((c) => ({ ...c.pos }))
