@@ -19,15 +19,18 @@ import {
   isFastLevel,
   pickFood,
   rollPowerup,
-  MAGGOT_SPAWN_CHANCE,
+  maggotSpawnChanceForLevel,
   trapCountForLevel,
 } from "./Spawns.ts";
+import { createDementedMouse } from "../game/DementedMouse.ts";
+import { DEMENTED_MOUSE_MIN_LEVEL, DEMENTED_MOUSE_SPAWN_CHANCE } from "../game/balance.ts";
 
 export interface RoomSpec {
   baseSeed: number;
   level: number; // 1..10
   index: number; // 0-based position in the level's chain
   count: number; // rooms in this level
+  allowToothpick?: boolean;
 }
 
 /** Room size limits, in tiles, INCLUDING the wall frame (before scaledSize's level scaling). */
@@ -97,6 +100,7 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
     food: [],
     traps: [],
     items: [],
+    dementedMouse: null,
     isBossArena: arena,
   };
 
@@ -218,7 +222,7 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
   }
 
   // 7. power-up 0–1, rare (the arena gets none — the Big Cheese appears there later)
-  const power = arena ? null : rollPowerup(rng);
+  const power = arena ? null : rollPowerup(rng, level, spec.allowToothpick ?? true);
   if (power) {
     const p = take(reachable);
     if (p) {
@@ -228,10 +232,18 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
   }
 
   // 8. maggot (fly larva) — 10–15% chance per room
-  if (!arena && rng.chance(MAGGOT_SPAWN_CHANCE)) {
+  if (!arena && rng.chance(maggotSpawnChanceForLevel(level))) {
     const p = take(reachable);
     if (p) {
       room.items.push({ kind: "maggot", pos: p });
+    }
+  }
+
+  // 9. demented teammate ("Тімейт з деменцією") — 50% chance starting level 7
+  if (level >= DEMENTED_MOUSE_MIN_LEVEL && !arena && rng.chance(DEMENTED_MOUSE_SPAWN_CHANCE)) {
+    const p = take(reachable);
+    if (p) {
+      room.dementedMouse = createDementedMouse(p);
     }
   }
 

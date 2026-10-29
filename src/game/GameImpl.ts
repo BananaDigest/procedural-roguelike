@@ -34,17 +34,20 @@ import {
 import { createPlayer, tryMovePlayer } from "./Player.ts";
 import {
   createFly,
+  getFlySlots,
   moveFlies,
   repositionFlies,
   fliesAttackEnemies,
   removeDeadFlies,
 } from "./Fly.ts";
 import {
+  playerAttackDamage,
   playerAttackEnemy,
   removeDeadEnemies,
   pickUpFood,
   applyTrapDamage,
 } from "./Combat.ts";
+import { processDementedMouseTurn } from "./DementedMouse.ts";
 import { processEnemyTurns } from "./Enemy.ts";
 import {
   BossState,
@@ -75,6 +78,9 @@ function deepCloneRoom(room: Room): Room {
     food: room.food.map((f) => ({ ...f, pos: { ...f.pos } })),
     traps: room.traps.map((t) => ({ pos: { ...t.pos } })),
     items: room.items.map((i) => ({ ...i, pos: { ...i.pos } })),
+    dementedMouse: room.dementedMouse
+      ? { ...room.dementedMouse, pos: { ...room.dementedMouse.pos } }
+      : null,
     isBossArena: room.isBossArena,
   };
 }
@@ -221,6 +227,21 @@ export class GameImpl implements Game {
       return;
     }
 
+    if (
+      room.dementedMouse &&
+      room.dementedMouse.hp > 0 &&
+      room.dementedMouse.pos.x === nx &&
+      room.dementedMouse.pos.y === ny
+    ) {
+      const dmg = playerAttackDamage(player, false);
+      room.dementedMouse.hp -= dmg;
+      if (room.dementedMouse.hp <= 0) {
+        room.dementedMouse = null;
+      }
+      this.postPlayerAction();
+      return;
+    }
+
     // ── 2. Walkability check & Move ───────────────────────────
     if (!tryMovePlayer(player, room, dx, dy)) return; // blocked — no turn passes
 
@@ -334,7 +355,13 @@ export class GameImpl implements Game {
           break;
         case "maggot":
           if (this.state.flies.length < MAX_FLIES) {
-            this.state.flies.push(createFly(player.pos));
+            const occupied = new Set(this.state.flies.map((f) => `${f.pos.x},${f.pos.y}`));
+            occupied.add(`${player.pos.x},${player.pos.y}`);
+            const slots = getFlySlots(player.pos, room, room.enemies, MAX_FLIES);
+            const freeSlot =
+              slots.find((s) => !occupied.has(`${s.x},${s.y}`)) ??
+              slots[0] ?? { x: player.pos.x + 1, y: player.pos.y };
+            this.state.flies.push(createFly(freeSlot));
           } else {
             for (const f of this.state.flies) {
               f.hp = f.maxHp;
@@ -457,7 +484,7 @@ export class GameImpl implements Game {
 
     // Flies follow the player into the new room/level
     if (this.state.flies.length > 0) {
-      repositionFlies(this.state.flies, this.state.player.pos, this.state.room);
+      repositionFlies(this.state.flies, this.state.player.pos, this.state.room, this.state.room.enemies);
     }
   }
 
@@ -517,6 +544,10 @@ export class GameImpl implements Game {
     this.state.roomCount = chain.length;
     this.state.room = newRoom;
 
+    // Toothpick buff expires on entering a new level
+    this.hasToothpick = false;
+    this.state.player.attack = PLAYER_BASE_ATTACK;
+
     // Place player at the arrival point.
     if (dir === "fwd") {
       // Entering from the start of the new level.
@@ -573,23 +604,43 @@ export class GameImpl implements Game {
 
     // ── Fly companion turns (movement & attack) ───────────────
     if (this.state.flies.length > 0) {
-      moveFlies(this.state.flies, player.pos, room, turnRng);
-      fliesAttackEnemies(this.state.flies, room);
+      moveFlies(this.state.flies, player.pos, room, room.enemies, turnRng);
+      fliesAttackEnemies(this.state.flies, player.pos, room);
     }
 
     // ── Enemy turns ───────────────────────────────────────────
-    const enemyAttacked = processEnemyTurns(
+    const hpBefore = player.hp;
+    processEnemyTurns(
       room,
       player,
       turnRng,
       this.energyTurnsLeft > 0,
       this.state.flies,
     );
-    if (enemyAttacked) this.playerHitFlash = 3;
+    if (player.hp < hpBefore) this.playerHitFlash = 3;
 
     // Remove any flies defeated by enemies
     if (this.state.flies.length > 0) {
       this.state.flies = removeDeadFlies(this.state.flies);
+    }
+
+    // ── Demented teammate turn ───────────────────────────────
+    if (room.dementedMouse && room.dementedMouse.hp > 0) {
+      const hpBeforeMouse = player.hp;
+      processDementedMouseTurn(
+        room.dementedMouse,
+        room,
+        player,
+        this.state.flies,
+        turnRng,
+      );
+      if (player.hp < hpBeforeMouse) this.playerHitFlash = 3;
+      if (room.dementedMouse.hp <= 0) {
+        room.dementedMouse = null;
+      }
+      if (this.state.flies.length > 0) {
+        this.state.flies = removeDeadFlies(this.state.flies);
+      }
     }
 
     // ── Boss turn ─────────────────────────────────────────────

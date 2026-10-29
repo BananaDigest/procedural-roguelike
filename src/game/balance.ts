@@ -18,7 +18,8 @@ export const PLAYER_MAX_HP = 20 as const;
 export const PLAYER_BASE_ATTACK = 4 as const;
 
 /** Extra damage granted by the Toothpick weapon (total = BASE + BONUS). */
-export const TOOTHPICK_ATTACK_BONUS = 2 as const;
+/** Extra damage granted by the Toothpick weapon (total = BASE + BONUS = 4 + 4 = 8). */
+export const TOOTHPICK_ATTACK_BONUS = 4 as const;
 
 // ── Enemy damage to player ────────────────────────────────────────
 
@@ -86,6 +87,48 @@ export const FLY_DAMAGE = 2 as const;
 
 /** Spawn chance for a maggot (fly larva) per room (10–15%). */
 export const MAGGOT_SPAWN_CHANCE = 0.15 as const;
+
+/** Multiplier for maggot spawn chance after level 7 (2x). */
+export const MAGGOT_SPAWN_CHANCE_AFTER_L7_MULT = 2 as const;
+
+/** Initial (base) spawn chance for the toothpick weapon per room (10%). */
+export const TOOTHPICK_BASE_SPAWN_CHANCE = 0.10 as const;
+
+/** Additional toothpick spawn chance per level starting at level 8 (+10% per level). */
+export const TOOTHPICK_SPAWN_CHANCE_PER_LEVEL_AFTER_L7 = 0.10 as const;
+
+/** Calculate toothpick spawn chance for a given level (10% base, +10% per level after 7). */
+export function toothpickSpawnChanceForLevel(level: number): number {
+  const extraLevels = Math.max(0, level - 7);
+  return (
+    TOOTHPICK_BASE_SPAWN_CHANCE +
+    extraLevels * TOOTHPICK_SPAWN_CHANCE_PER_LEVEL_AFTER_L7
+  );
+}
+
+/** Calculate maggot spawn chance for a given level (doubled after level 7). */
+export function maggotSpawnChanceForLevel(level: number): number {
+  return level > 7
+    ? MAGGOT_SPAWN_CHANCE * MAGGOT_SPAWN_CHANCE_AFTER_L7_MULT
+    : MAGGOT_SPAWN_CHANCE;
+}
+
+// ── Demented Teammate ("Тімейт з деменцією") ──────────────────────
+
+/** Hit-points of the demented mouse teammate. */
+export const DEMENTED_MOUSE_HP = 13 as const;
+
+/** Damage dealt by the demented teammate per attack. */
+export const DEMENTED_MOUSE_DAMAGE = 3 as const;
+
+/** First level where the demented teammate can appear (level 7+). */
+export const DEMENTED_MOUSE_MIN_LEVEL = 7 as const;
+
+/** Spawn chance per room for the demented teammate starting at level 7. */
+export const DEMENTED_MOUSE_SPAWN_CHANCE = 0.5 as const;
+
+/** Number of steps the demented teammate takes per player turn (fast: 2 steps per 1). */
+export const DEMENTED_MOUSE_STEPS_PER_TURN = 2 as const;
 
 // ── Boss phases ───────────────────────────────────────────────────
 

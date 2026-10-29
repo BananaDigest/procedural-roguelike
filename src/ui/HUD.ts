@@ -22,6 +22,13 @@ export class HUD {
   }
 
   draw(state: GameState): void {
+    const text =
+      `Level ${state.level} · Room ${state.roomIndex + 1}/${state.roomCount}` +
+      `    HP ${state.player.hp}/${state.player.maxHp}` +
+      `    Atk ${state.player.attack}` +
+      (state.flies?.length ? `    Flies x${state.flies.length}` : "") +
+      `    Cheese x${state.score}` +
+      `    Seed ${state.seed}`;
     const ctx = this.ctx;
     const W = VIEW.w * TILE_SIZE;
     const pal = paletteForLevel(state.level);
