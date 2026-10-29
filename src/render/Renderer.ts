@@ -267,21 +267,21 @@ export class Renderer {
   private exit(cx: number, cy: number, kind: "nora" | "luk", dir: "fwd" | "back") {
     const ctx = this.ctx;
     const X = cx + T / 2, Y = cy + T / 2;
-    // forward (deeper, toward the goal) = gold; back (toward the start) = blue.
-    const accent = dir === "fwd" ? "#f2c84b" : "#5aa0ff";
-    if (kind === "nora") {
-      ctx.fillStyle = "#000000";
-      ctx.beginPath(); ctx.ellipse(X, Y, T * 0.34, T * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.stroke();
-    } else {
+    if (kind === "luk") {
+      // manhole — plain, no direction highlight
       ctx.fillStyle = "#3a3f45";
       ctx.beginPath(); ctx.arc(X, Y, T * 0.4, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = accent; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(X, Y, T * 0.4, 0, Math.PI * 2); ctx.stroke();
       ctx.strokeStyle = "#6b7177"; ctx.lineWidth = 1.4;
-      ctx.beginPath(); ctx.arc(X, Y, T * 0.24, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.27, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.14, 0, Math.PI * 2); ctx.stroke();
+      return;
     }
-    // direction arrow: fwd ▼ (go in / deeper), back ▲ (come out / go back)
+    // нора — highlighted by direction: fwd (deeper, toward goal) = gold,
+    // back (toward start) = blue; arrow ▼ in / ▲ out.
+    const accent = dir === "fwd" ? "#f2c84b" : "#5aa0ff";
+    ctx.fillStyle = "#000000";
+    ctx.beginPath(); ctx.ellipse(X, Y, T * 0.34, T * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.stroke();
     ctx.fillStyle = accent;
     ctx.beginPath();
     if (dir === "fwd") {
