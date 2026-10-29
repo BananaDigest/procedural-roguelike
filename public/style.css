@@ -40,7 +40,7 @@ h1 span {
   background: #000;
   border-radius: 8px;
   image-rendering: pixelated;
-  max-width: 100%;
+  /* width/height are set from JS (Renderer.fit) to fit the window */
   box-shadow: 0 12px 40px -20px rgba(0, 0, 0, 0.9);
 }
 
@@ -64,6 +64,8 @@ h1 span {
   padding: 24px 28px;
   text-align: center;
   line-height: 1.4;
+  /* same factor the canvas is scaled by (set from main.ts) */
+  transform: scale(var(--ui-scale, 1));
 }
 .screen-card h2 {
   font-size: 22px;

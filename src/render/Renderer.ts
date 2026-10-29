@@ -1,6 +1,10 @@
 /**
  * Renderer — draws the current room of a GameState. Reads state only.
- * Viewport is fixed (VW×VH tiles); the room is centered, everything else is fog.
+ * Viewport is VW×VH tiles (config.VIEW); the room is centered, everything else is fog.
+ *
+ * Scaling: all drawing below is in LOGICAL px (tile = T). `fit()` sizes the
+ * canvas to the browser window and applies ONE transform (scale × devicePixelRatio),
+ * so everything — tiles, sprites, effects, HUD — scales together and stays crisp.
  *
  * Draw order (per design doc): fog → floor → shelves → room outline →
  * transitions → traps/poison → food/items → enemies → mouse.
@@ -13,10 +17,11 @@ import {
   Tile,
 } from "../core/types.ts";
 import { Palette, paletteForLevel } from "./palette.ts";
+import { MIN_WINDOW_SCALE, TILE_SIZE, VIEW } from "../config.ts";
 
-const T = 28; // tile size, px
-const VW = 20;
-const VH = 14;
+const T = TILE_SIZE; // logical tile size, px
+const VW = VIEW.w;
+const VH = VIEW.h;
 
 const ENEMY_COLOR: Record<EnemyKind, string> = {
   cashier: "#39b3c6",
@@ -32,13 +37,39 @@ export interface DrawOpts {
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
+  /** Current window scale (logical px → CSS px). */
+  scale = 1;
 
-  constructor(canvas: HTMLCanvasElement) {
-    canvas.width = VW * T;
-    canvas.height = VH * T;
+  constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("2D canvas context unavailable");
     this.ctx = ctx;
+    this.fit(VW * T, VH * T);
+  }
+
+  /**
+   * Scale the canvas to the largest size that fits `availW × availH` CSS px,
+   * keeping the aspect ratio. The scale is snapped so a tile covers a whole
+   * number of device pixels — no blur, no seams between floor tiles.
+   * Call again on window resize, then redraw.
+   */
+  fit(availW: number, availH: number): number {
+    const dpr = window.devicePixelRatio || 1;
+    const raw = Math.max(MIN_WINDOW_SCALE, Math.min(availW / (VW * T), availH / (VH * T)));
+    const devTile = Math.max(1, Math.floor(T * raw * dpr)); // device px per tile
+    const scale = devTile / (T * dpr);
+
+    const c = this.canvas;
+    c.width = VW * devTile;
+    c.height = VH * devTile;
+    c.style.width = `${(VW * devTile) / dpr}px`;
+    c.style.height = `${(VH * devTile) / dpr}px`;
+
+    // Resizing the canvas resets context state — set the one transform again.
+    this.ctx.setTransform(devTile / T, 0, 0, devTile / T, 0, 0);
+    this.ctx.imageSmoothingEnabled = false;
+    this.scale = scale;
+    return scale;
   }
 
   draw(state: GameState, opts: DrawOpts = {}): void {
