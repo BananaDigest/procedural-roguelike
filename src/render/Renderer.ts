@@ -99,7 +99,7 @@ export class Renderer {
     ctx.lineWidth = 2;
     ctx.strokeRect(ox * T + 1, oy * T + 1, r.w * T - 2, r.h * T - 2);
 
-    for (const e of r.exits) this.exit(px(e.pos.x), py(e.pos.y), e.kind);
+    for (const e of r.exits) this.exit(px(e.pos.x), py(e.pos.y), e.kind, e.dir);
     for (const t of r.traps) this.trap(px(t.pos.x), py(t.pos.y));
     for (const c of state.clouds) this.poisonCloud(px(c.x), py(c.y));
     for (const f of r.food) this.food(px(f.pos.x), py(f.pos.y), f.kind);
@@ -364,20 +364,33 @@ export class Renderer {
     }
   }
 
-  private exit(cx: number, cy: number, kind: "nora" | "luk") {
+  private exit(cx: number, cy: number, kind: "nora" | "luk", dir: "fwd" | "back") {
     const ctx = this.ctx;
     const X = cx + T / 2, Y = cy + T / 2;
+    // forward (deeper, toward the goal) = gold; back (toward the start) = blue.
+    const accent = dir === "fwd" ? "#f2c84b" : "#5aa0ff";
     if (kind === "nora") {
       ctx.fillStyle = "#000000";
       ctx.beginPath(); ctx.ellipse(X, Y, T * 0.34, T * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,.3)"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.stroke();
     } else {
       ctx.fillStyle = "#3a3f45";
       ctx.beginPath(); ctx.arc(X, Y, T * 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = accent; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.4, 0, Math.PI * 2); ctx.stroke();
       ctx.strokeStyle = "#6b7177"; ctx.lineWidth = 1.4;
-      ctx.beginPath(); ctx.arc(X, Y, T * 0.27, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(X, Y, T * 0.14, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X, Y, T * 0.24, 0, Math.PI * 2); ctx.stroke();
     }
+    // direction arrow: fwd ▼ (go in / deeper), back ▲ (come out / go back)
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    if (dir === "fwd") {
+      ctx.moveTo(X - 3.2, Y - 2.4); ctx.lineTo(X + 3.2, Y - 2.4); ctx.lineTo(X, Y + 2.8);
+    } else {
+      ctx.moveTo(X - 3.2, Y + 2.4); ctx.lineTo(X + 3.2, Y + 2.4); ctx.lineTo(X, Y - 2.8);
+    }
+    ctx.closePath();
+    ctx.fill();
   }
 }
 
