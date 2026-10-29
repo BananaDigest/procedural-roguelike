@@ -28,6 +28,7 @@ import { Mulberry32 } from "../rng/Mulberry32.ts";
 import {
   DEMENTED_MOUSE_HP,
   DEMENTED_MOUSE_DAMAGE,
+  DEMENTED_MOUSE_STEPS_PER_TURN,
 } from "./balance.ts";
 import { removeDeadEnemies } from "./Combat.ts";
 import { isAdjacent } from "./Enemy.ts";
@@ -102,13 +103,9 @@ export function dementedMouseAttackEnemy(
 }
 
 /**
- * Process one turn for the demented mouse.
- *
- * It acts unpredictably:
- * - If adjacent to enemies or player, it can randomly attack one of them, or wander.
- * - Otherwise, it wanders randomly into an unoccupied walkable floor tile.
+ * Execute a single step/action for the demented mouse (attack or move).
  */
-export function processDementedMouseTurn(
+export function stepDementedMouse(
   mouse: DementedMouse,
   room: Room,
   player: Player,
@@ -183,6 +180,23 @@ export function processDementedMouseTurn(
         removeDeadEnemies(room);
       }
     }
+  }
+}
+
+/**
+ * Process one player turn for the demented mouse.
+ * The demented teammate takes 2 steps per 1 player turn (fast movement & actions).
+ */
+export function processDementedMouseTurn(
+  mouse: DementedMouse,
+  room: Room,
+  player: Player,
+  flies: Fly[],
+  rng: Mulberry32,
+): void {
+  for (let s = 0; s < DEMENTED_MOUSE_STEPS_PER_TURN; s++) {
+    if (mouse.hp <= 0) break;
+    stepDementedMouse(mouse, room, player, flies, rng);
   }
 }
 

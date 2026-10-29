@@ -24,8 +24,19 @@ export function roomCountForLevel(baseSeed: number, level: number): number {
 export const generateLevel: GenerateLevel = (seed: number, level: number): Room[] => {
   const count = roomCountForLevel(seed, level);
   const rooms: Room[] = [];
+  let toothpickSpawned = false;
   for (let index = 0; index < count; index++) {
-    rooms.push(generateRoom({ baseSeed: seed, level, index, count }));
+    const room = generateRoom({
+      baseSeed: seed,
+      level,
+      index,
+      count,
+      allowToothpick: !toothpickSpawned,
+    });
+    if (room.items.some((i) => i.kind === "toothpick")) {
+      toothpickSpawned = true;
+    }
+    rooms.push(room);
   }
   return rooms;
 };

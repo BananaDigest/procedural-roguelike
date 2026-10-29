@@ -4,9 +4,17 @@
  */
 import { Mulberry32 } from "../rng/Mulberry32.ts";
 import type { EnemyKind, FoodKind, ItemKind } from "../core/types.ts";
-import { MAGGOT_SPAWN_CHANCE } from "../game/balance.ts";
+import {
+  MAGGOT_SPAWN_CHANCE,
+  maggotSpawnChanceForLevel,
+  toothpickSpawnChanceForLevel,
+} from "../game/balance.ts";
 
-export { MAGGOT_SPAWN_CHANCE };
+export {
+  MAGGOT_SPAWN_CHANCE,
+  maggotSpawnChanceForLevel,
+  toothpickSpawnChanceForLevel,
+};
 
 export const LAST_LEVEL = 10;
 
@@ -111,12 +119,26 @@ export function pickFood(level: number, rng: Mulberry32): { kind: FoodKind; heal
 /** Chance that a room has a power-up at all («0–1, рідко»). */
 export const POWERUP_CHANCE = 0.15;
 
-const POWERUP_POOL: { value: ItemKind; weight: number }[] = [
+export const POWERUP_POOL: { value: ItemKind; weight: number }[] = [
   { value: "energy", weight: 2 },
   { value: "toothpick", weight: 1 },
 ];
 
-/** 0 or 1 power-up for a room. The Big Cheese is never rolled — B spawns it after the boss. */
-export function rollPowerup(rng: Mulberry32): ItemKind | null {
-  return rng.chance(POWERUP_CHANCE) ? rng.weighted(POWERUP_POOL) : null;
+/** 0 or 1 power-up for a room.
+ * Baseline (levels 1-7): 15% room chance (10% energy, 5% toothpick).
+ * After level 7: toothpick spawn chance increases by 5% (+0.05) per level.
+ */
+export function rollPowerup(
+  rng: Mulberry32,
+  level: number = 1,
+  allowToothpick: boolean = true,
+): ItemKind | null {
+  const toothpickChance = allowToothpick
+    ? toothpickSpawnChanceForLevel(level)
+    : 0;
+  const energyChance = 0.10;
+  const totalChance = toothpickChance + energyChance;
+
+  if (!rng.chance(totalChance)) return null;
+  return rng.chance(toothpickChance / totalChance) ? "toothpick" : "energy";
 }
