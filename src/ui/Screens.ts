@@ -14,11 +14,105 @@ export class Screens {
   /** onStart receives the raw seed string ("" = random). */
   title(onStart: (seed: string) => void): void {
     this.panel([
+      this.titleArt(),
       this.h('«А Тебе?»', "brand"),
-      this.p("Mouse in the Market", "sub"),
-      this.p("WASD / arrows / numpad — move · M — map · R — new run"),
+      this.p("Mouse in the Market — a new market every run", "sub"),
+      this.controls(),
       this.seedRow(onStart),
     ]);
+  }
+
+  // --- title decoration ---
+  private titleArt(): HTMLCanvasElement {
+    const W = 248, Hh = 92;
+    const c = document.createElement("canvas");
+    c.className = "title-art";
+    const dpr = window.devicePixelRatio || 1;
+    c.width = W * dpr;
+    c.height = Hh * dpr;
+    c.style.width = `${W}px`;
+    c.style.height = `${Hh}px`;
+    const ctx = c.getContext("2d");
+    if (!ctx) return c;
+    ctx.scale(dpr, dpr);
+
+    // faint floor dots
+    ctx.fillStyle = "rgba(230,235,240,0.16)";
+    for (let i = 0; i < 9; i++) ctx.fillRect(26 + i * 25, Hh - 18, 2, 2);
+    // trail of dots from the mouse toward the cheese
+    ctx.fillStyle = "rgba(245,246,248,0.5)";
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.arc(92 + i * 15, Hh * 0.52, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    this.artMouse(ctx, 46, Hh * 0.52);
+    this.artCheese(ctx, 196, Hh * 0.5);
+    return c;
+  }
+
+  private artMouse(ctx: CanvasRenderingContext2D, X: number, Y: number): void {
+    const s = 34, bx = X - s / 2, by = Y - s / 2;
+    ctx.fillStyle = "#f5f6f8";
+    ctx.strokeStyle = "#5a5f66";
+    ctx.lineWidth = 1.5;
+    for (const ex of [bx + 7, bx + s - 7]) {
+      ctx.beginPath();
+      ctx.moveTo(ex, by + 2); ctx.lineTo(ex - 6, by - 6); ctx.lineTo(ex + 6, by - 5);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.roundRect(bx, by, s, s, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#111111";
+    ctx.beginPath(); ctx.arc(X - 6, Y - 2, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(X + 6, Y - 2, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ff9ec4";
+    ctx.beginPath(); ctx.arc(X, Y + 5, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#ff9ec4"; ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(bx + s, Y + 6);
+    ctx.quadraticCurveTo(X + s * 0.85, Y + 6, X + s * 0.72, Y - 9);
+    ctx.stroke();
+  }
+
+  private artCheese(ctx: CanvasRenderingContext2D, X: number, Y: number): void {
+    const s = 46;
+    const p1 = [X - s * 0.5, Y + s * 0.32] as const;
+    const p2 = [X + s * 0.5, Y + s * 0.32] as const;
+    const p3 = [X, Y - s * 0.42] as const;
+    ctx.save();
+    ctx.shadowColor = "rgba(242,183,5,0.55)";
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = "#f2b705";
+    ctx.beginPath();
+    ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = "#b5850a"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]);
+    ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = "#d9a92a";
+    ctx.beginPath(); ctx.arc(X - 5, Y + 7, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(X + 6, Y + 2, 1.9, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(X - 1, Y - 4, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  private controls(): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.className = "keys";
+    const items: [string, string][] = [["WASD", "move"], ["M", "map"], ["R", "new run"]];
+    for (const [k, label] of items) {
+      const chip = document.createElement("span");
+      chip.className = "key-chip";
+      const kbd = document.createElement("kbd");
+      kbd.textContent = k;
+      const lab = document.createElement("span");
+      lab.className = "key-label";
+      lab.textContent = label;
+      chip.append(kbd, lab);
+      wrap.appendChild(chip);
+    }
+    return wrap;
   }
 
   gameOver(score: number, onRestart: () => void): void {
