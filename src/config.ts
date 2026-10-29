@@ -27,3 +27,5 @@ export const MIN_WINDOW_SCALE = 0.5;
 export const DEBUG_LEVEL_SELECT = true;
 /** KeyboardEvent.code of that hotkey (` — the key left of 1). */
 export const DEBUG_LEVEL_SELECT_KEY = "Backquote";
+/** Same flag also enables: this key kills the level-10 boss instantly. */
+export const DEBUG_KILL_BOSS_KEY = "KeyK";

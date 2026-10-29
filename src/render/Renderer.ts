@@ -10,6 +10,7 @@
  * transitions → traps/poison → food/items → enemies → mouse.
  */
 import {
+  Enemy,
   EnemyKind,
   Fly,
   FoodKind,
@@ -104,7 +105,7 @@ export class Renderer {
     for (const c of state.clouds) this.poisonCloud(px(c.x), py(c.y));
     for (const f of r.food) this.food(px(f.pos.x), py(f.pos.y), f.kind);
     for (const it of r.items) this.item(px(it.pos.x), py(it.pos.y), it.kind);
-    for (const en of r.enemies) this.enemy(px(en.pos.x), py(en.pos.y), en.kind);
+    for (const en of r.enemies) this.enemy(px(en.pos.x), py(en.pos.y), en);
     if (!opts.hideMouse) this.mouse(px(state.player.pos.x), py(state.player.pos.y));
     for (const fly of state.flies) this.fly(px(fly.pos.x), py(fly.pos.y), fly);
   }
@@ -168,8 +169,9 @@ export class Renderer {
   }
 
   // --- enemies ---
-  private enemy(cx: number, cy: number, kind: EnemyKind) {
+  private enemy(cx: number, cy: number, en: Enemy) {
     const ctx = this.ctx;
+    const kind = en.kind;
     const boss = kind === "boss";
     const w = T * (boss ? 0.7 : 0.5);
     const h = T * (boss ? 1.0 : 0.72);
@@ -202,6 +204,25 @@ export class Renderer {
       ctx.lineTo(ex + w + T * 0.12, ey + h);
       ctx.stroke();
     }
+
+    // health bar over the head (above the loader's box), as wide as the body
+    const headTop = kind === "loader" ? ey - T * 0.14 : ey;
+    this.healthBar(ex, headTop - T * 0.06, w, en.hp, en.maxHp);
+  }
+
+  /**
+   * Thin HP bar; (x, bottom) is its bottom-left corner. Logical px — the
+   * canvas transform scales it with the rest of the game.
+   */
+  private healthBar(x: number, bottom: number, w: number, hp: number, maxHp: number) {
+    if (hp <= 0 || maxHp <= 0) return;
+    const ctx = this.ctx;
+    const h = T * 0.12; // ≈3.4 px at scale 1
+    const y = bottom - h;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "#e2231a";
+    ctx.fillRect(x, y, w * Math.min(1, hp / maxHp), h);
   }
 
   // --- food (all 10 kinds) ---
