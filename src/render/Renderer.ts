@@ -216,11 +216,28 @@ export class Renderer {
         ctx.beginPath(); ctx.arc(X - 2, Y + 3, 1.8, 0, 7); ctx.fill();
         ctx.beginPath(); ctx.arc(X + 3, Y + 1, 1.5, 0, 7); ctx.fill();
         break;
-      case "croissant":
-        ctx.strokeStyle = "#d9a441"; ctx.lineWidth = T * 0.1; ctx.lineCap = "round";
-        ctx.beginPath(); ctx.arc(X, Y, T * 0.2, Math.PI * 0.25, Math.PI * 1.55); ctx.stroke();
-        ctx.lineCap = "butt";
+      case "croissant": {
+        // filled crescent: fat in the middle, tapering to pointed horns
+        const lx = cx + 0.27 * T, rx = cx + 0.73 * T, hy = cy + 0.4 * T;
+        ctx.beginPath();
+        ctx.moveTo(lx, hy);
+        ctx.quadraticCurveTo(cx + 0.5 * T, cy + 0.82 * T, rx, hy); // outer belly
+        ctx.quadraticCurveTo(cx + 0.5 * T, cy + 0.52 * T, lx, hy); // inner curve
+        ctx.closePath();
+        ctx.fillStyle = "#e3a94a";
+        ctx.fill();
+        ctx.strokeStyle = "#b5832f";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // segment ridges
+        ctx.beginPath();
+        for (const sx of [0.43, 0.5, 0.57]) {
+          ctx.moveTo(cx + sx * T, cy + 0.51 * T);
+          ctx.lineTo(cx + sx * T, cy + 0.6 * T);
+        }
+        ctx.stroke();
         break;
+      }
       case "cookie":
         ctx.fillStyle = "#b07a3f"; ctx.beginPath(); ctx.arc(X, Y, T * 0.18, 0, 7); ctx.fill();
         ctx.fillStyle = "#5a3a1a";
@@ -230,7 +247,12 @@ export class Renderer {
         ctx.fillStyle = "#c9975b"; ctx.beginPath(); ctx.roundRect(cx + T * 0.28, cy + T * 0.36, T * 0.44, T * 0.3, T * 0.12); ctx.fill();
         break;
       case "sausage":
-        ctx.fillStyle = "#a8503a"; ctx.beginPath(); ctx.roundRect(cx + T * 0.26, cy + T * 0.42, T * 0.48, T * 0.18, T * 0.09); ctx.fill();
+        ctx.fillStyle = "#e38a9a"; // pink sausage
+        ctx.beginPath(); ctx.roundRect(cx + T * 0.26, cy + T * 0.42, T * 0.48, T * 0.18, T * 0.09); ctx.fill();
+        ctx.fillStyle = "#f5eef0"; // white fat specks
+        for (const d of [[0.37, 0.5], [0.5, 0.52], [0.63, 0.49]]) {
+          ctx.beginPath(); ctx.arc(cx + d[0] * T, cy + d[1] * T, T * 0.025, 0, Math.PI * 2); ctx.fill();
+        }
         break;
       case "cake":
         ctx.fillStyle = "#f3d9b8"; ctx.beginPath(); ctx.moveTo(cx + T * 0.3, cy + T * 0.68); ctx.lineTo(cx + T * 0.7, cy + T * 0.68); ctx.lineTo(cx + T * 0.5, cy + T * 0.34); ctx.closePath(); ctx.fill();
