@@ -223,3 +223,42 @@ h1 span {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* toast — short in-game message (e.g. «Cheese power!») */
+.toast {
+  position: absolute;
+  top: calc(30px * var(--ui-scale, 1));
+  left: 50%;
+  transform: translateX(-50%) scale(var(--ui-scale, 1));
+  transform-origin: top center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 9px 18px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  background: rgba(13, 15, 20, 0.86);
+  border: 1px solid rgba(242, 183, 5, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 14px 40px -18px rgba(0, 0, 0, 0.9);
+  animation: toast-in 0.25s ease-out both;
+}
+.toast[hidden] { display: none; }
+.toast strong {
+  color: #f2b705;
+  font-size: 15px;
+  text-shadow: 0 2px 14px rgba(242, 183, 5, 0.35);
+}
+.toast span {
+  color: var(--text);
+  font-size: 12px;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(var(--ui-scale, 1)); }
+  to   { opacity: 1; transform: translateX(-50%) scale(var(--ui-scale, 1)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
