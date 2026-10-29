@@ -19,6 +19,7 @@ export class HUD {
     const text =
       `Level ${state.level} · Room ${state.roomIndex + 1}/${state.roomCount}` +
       `    HP ${state.player.hp}/${state.player.maxHp}` +
+      (state.flies?.length ? `    Flies x${state.flies.length}` : "") +
       `    Cheese x${state.score}` +
       `    Seed ${state.seed}`;
     const ctx = this.ctx;

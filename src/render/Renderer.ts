@@ -11,6 +11,7 @@
  */
 import {
   EnemyKind,
+  Fly,
   FoodKind,
   GameState,
   ItemKind,
@@ -105,6 +106,7 @@ export class Renderer {
     for (const it of r.items) this.item(px(it.pos.x), py(it.pos.y), it.kind);
     for (const en of r.enemies) this.enemy(px(en.pos.x), py(en.pos.y), en.kind);
     if (!opts.hideMouse) this.mouse(px(state.player.pos.x), py(state.player.pos.y));
+    for (const fly of state.flies) this.fly(px(fly.pos.x), py(fly.pos.y), fly);
   }
 
   /** Translucent full-screen flash (red = took damage, white = landed a bite). */
@@ -262,6 +264,24 @@ export class Renderer {
     if (kind === "toothpick") {
       ctx.strokeStyle = "#b98a5a"; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(cx + T * 0.3, cy + T * 0.7); ctx.lineTo(cx + T * 0.7, cy + T * 0.3); ctx.stroke();
+    } else if (kind === "maggot") {
+      ctx.fillStyle = "#ede7d5";
+      ctx.beginPath();
+      ctx.ellipse(X, Y, T * 0.22, T * 0.12, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#5a5240";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.strokeStyle = "#c4bca2";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(X - 2, Y - 2.5); ctx.lineTo(X - 2, Y + 2.5);
+      ctx.moveTo(X + 2, Y - 2.5); ctx.lineTo(X + 2, Y + 2.5);
+      ctx.stroke();
+      ctx.fillStyle = "#665742";
+      ctx.beginPath();
+      ctx.arc(X - T * 0.15, Y + 0.5, 1.4, 0, Math.PI * 2);
+      ctx.fill();
     } else if (kind === "energy") {
       ctx.strokeStyle = "#ffd84d"; ctx.lineWidth = 2; ctx.lineJoin = "round";
       ctx.beginPath();
@@ -293,6 +313,55 @@ export class Renderer {
     ctx.beginPath();
     ctx.arc(cx + T / 2, cy + T / 2, T * 0.45, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // --- fly companion (weapon: "муха") ---
+  private fly(cx: number, cy: number, fly: Fly) {
+    const ctx = this.ctx;
+    const X = cx + T / 2;
+    const Y = cy + T / 2;
+
+    // Translucent buzzing wings
+    ctx.fillStyle = "rgba(180, 225, 255, 0.75)";
+    ctx.strokeStyle = "rgba(100, 150, 200, 0.8)";
+    ctx.lineWidth = 1;
+
+    // Left wing
+    ctx.beginPath();
+    ctx.ellipse(X - T * 0.1, Y - T * 0.12, T * 0.14, T * 0.07, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Right wing
+    ctx.beginPath();
+    ctx.ellipse(X + T * 0.1, Y - T * 0.12, T * 0.14, T * 0.07, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Fly body (dark oval)
+    ctx.fillStyle = "#1e2024";
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(X, Y, T * 0.14, T * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Red compound eyes
+    ctx.fillStyle = "#e2231a";
+    ctx.beginPath(); ctx.arc(X - 2.5, Y - 2, 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(X + 2.5, Y - 2, 1.2, 0, Math.PI * 2); ctx.fill();
+
+    // Health bar if damaged
+    if (fly.hp < fly.maxHp) {
+      const bw = T * 0.4;
+      const bx = X - bw / 2;
+      const by = Y - T * 0.28;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(bx - 1, by - 1, bw + 2, 4);
+      ctx.fillStyle = "#2ecc71";
+      ctx.fillRect(bx, by, bw * (fly.hp / fly.maxHp), 2);
+    }
   }
 
   private exit(cx: number, cy: number, kind: "nora" | "luk", dir: "fwd" | "back") {

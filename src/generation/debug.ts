@@ -9,7 +9,7 @@
 import { type EnemyKind, type ItemKind, type Room, Tile } from "../core/types.ts";
 
 const ENEMY_CH: Record<EnemyKind, string> = { cashier: "c", loader: "g", guard: "G", boss: "B" };
-const ITEM_CH: Record<ItemKind, string> = { toothpick: "t", energy: "e", bigcheese: "C" };
+const ITEM_CH: Record<ItemKind, string> = { toothpick: "t", energy: "e", bigcheese: "C", maggot: "m" };
 
 export function roomToAscii(room: Room): string {
   const grid: string[][] = [];

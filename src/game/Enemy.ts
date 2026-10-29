@@ -19,9 +19,9 @@
  *  - An active Energy Drink freezes all enemies for the turn.
  */
 
-import { Room, Enemy, Vec2, Player, isWalkable } from "../core/types.ts";
+import { Room, Enemy, Vec2, Player, Fly, isWalkable } from "../core/types.ts";
 import { Mulberry32 } from "../rng/Mulberry32.ts";
-import { enemyAttackPlayer } from "./Combat.ts";
+import { enemyAttackPlayer, enemyAttackFly } from "./Combat.ts";
 
 // ── Geometry helpers ─────────────────────────────────────────────────────────
 
@@ -189,11 +189,23 @@ function stepEnemy(
   enemies: readonly Enemy[],
   player: Player,
   rng: Mulberry32,
+  flies?: Fly[],
 ): boolean {
   // Adjacent → melee attack instead of moving.
   if (isAdjacent(enemy.pos, player.pos)) {
     enemyAttackPlayer(enemy, player);
     return true;
+  }
+
+  // Adjacent to a fly companion → attack the fly!
+  if (flies && flies.length > 0) {
+    const targetFly = flies.find(
+      (f) => f.hp > 0 && isAdjacent(enemy.pos, f.pos),
+    );
+    if (targetFly) {
+      enemyAttackFly(enemy, targetFly);
+      return true;
+    }
   }
 
   // Move according to behaviour kind.
@@ -223,6 +235,7 @@ function stepEnemy(
  * @param player       - The player state (may be mutated by enemy attacks).
  * @param rng          - Seeded PRNG instance.
  * @param energyActive - Whether the Energy Drink freeze effect is in play.
+ * @param flies        - Optional active fly companions (enemies can attack them).
  * @returns `true` if **any** enemy attacked the player this round.
  */
 export function processEnemyTurns(
@@ -230,6 +243,7 @@ export function processEnemyTurns(
   player: Player,
   rng: Mulberry32,
   energyActive: boolean,
+  flies?: Fly[],
 ): boolean {
   if (energyActive) return false; // enemies are frozen during energy effect
 
@@ -238,7 +252,7 @@ export function processEnemyTurns(
   for (const enemy of room.enemies) {
     if (enemy.hp <= 0) continue;
 
-    const attacked1 = stepEnemy(enemy, room, room.enemies, player, rng);
+    const attacked1 = stepEnemy(enemy, room, room.enemies, player, rng, flies);
     if (attacked1) {
       anyAttacked = true;
       continue; // no second step after an attack
@@ -246,7 +260,7 @@ export function processEnemyTurns(
 
     // Fast enemies get a second step.
     if (enemy.fast) {
-      const attacked2 = stepEnemy(enemy, room, room.enemies, player, rng);
+      const attacked2 = stepEnemy(enemy, room, room.enemies, player, rng, flies);
       if (attacked2) anyAttacked = true;
     }
   }
