@@ -312,4 +312,4 @@ export class Renderer {
   }
 }
 
-export { VW as VIEW_W, VH as VIEW_H };
+export { T as TILE_SIZE, VW as VIEW_W, VH as VIEW_H };
