@@ -188,12 +188,12 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
       boss = take((p) => Math.max(Math.abs(p.x - c.x), Math.abs(p.y - c.y)) <= r);
     }
     if (!boss) return null;
-    room.enemies.push({ kind: "boss", pos: boss, hp: ENEMY_HP.boss, fast: true });
+    room.enemies.push({ kind: "boss", pos: boss, hp: ENEMY_HP.boss, maxHp: ENEMY_HP.boss, fast: true });
   } else {
     for (const kind of enemiesForLevel(level, rng)) {
       const p = take(farFromEntry(4)) ?? take(farFromEntry(2));
       if (!p) break; // room too crowded — fewer enemies is fine
-      const enemy: Enemy = { kind, pos: p, hp: ENEMY_HP[kind], fast };
+      const enemy: Enemy = { kind, pos: p, hp: ENEMY_HP[kind], maxHp: ENEMY_HP[kind], fast };
       room.enemies.push(enemy);
     }
   }

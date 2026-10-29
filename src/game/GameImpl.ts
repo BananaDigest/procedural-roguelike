@@ -49,6 +49,7 @@ import { processEnemyTurns } from "./Enemy.ts";
 import {
   BossState,
   createBossState,
+  findBoss,
   processBossTurn,
   PoisonCloud,
 } from "./Boss.ts";
@@ -392,6 +393,27 @@ export class GameImpl implements Game {
     this.saveCurrentRoom();
     this.enterLevel(level, "fwd");
     this.afterTransition();
+    return true;
+  }
+
+  /**
+   * DEBUG: instantly kill the Cleaning Lady. Works only while the player is
+   * in the level-10 arena with the boss alive. Goes through the same path as
+   * a killing bite (remove the dead enemy → turn passes → boss turn sees her
+   * gone → Big Cheese spawns), so victory works exactly as in normal play.
+   *
+   * @returns `true` if the boss was killed.
+   */
+  debugKillBoss(): boolean {
+    const { room } = this.state;
+    if (this.state.phase !== "playing" || this.state.level !== TOTAL_LEVELS) return false;
+    if (!room.isBossArena) return false;
+    const boss = findBoss(room);
+    if (!boss) return false;
+
+    boss.hp = 0;
+    removeDeadEnemies(room);
+    this.postPlayerAction();
     return true;
   }
 

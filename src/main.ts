@@ -11,7 +11,7 @@ import { HUD } from "./ui/HUD.ts";
 import { Minimap } from "./ui/Minimap.ts";
 import { Screens } from "./ui/Screens.ts";
 import { hashSeed } from "./rng/Mulberry32.ts";
-import { DEBUG_LEVEL_SELECT, DEBUG_LEVEL_SELECT_KEY } from "./config.ts";
+import { DEBUG_KILL_BOSS_KEY, DEBUG_LEVEL_SELECT, DEBUG_LEVEL_SELECT_KEY } from "./config.ts";
 
 /** Flip off to disable the G/H keys that preview the game-over / win screens. */
 const DEV_PREVIEW = true;
@@ -160,6 +160,16 @@ window.addEventListener("keydown", (e) => {
   if (DEBUG_LEVEL_SELECT && started && game.state.phase === "playing" && e.code === DEBUG_LEVEL_SELECT_KEY) {
     openLevelSelect();
     e.preventDefault(); // don't type ` into the box
+    return;
+  }
+  // DEBUG: K kills the boss (level-10 arena only) — same feedback as a killing bite.
+  if (DEBUG_LEVEL_SELECT && started && e.code === DEBUG_KILL_BOSS_KEY) {
+    if (game.debugKillBoss()) {
+      triggerFlash("#ffffff");
+      render();
+      syncPhase();
+    }
+    e.preventDefault();
     return;
   }
   if (e.code === "KeyR") {
