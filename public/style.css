@@ -151,7 +151,10 @@ h1 span {
 
 /* --- polished title screen --- */
 .screen-card {
-  background: rgba(13, 15, 20, 0.72);
+  max-width: 340px;
+  padding: 22px 26px 24px;
+  gap: 11px;
+  background: rgba(13, 15, 20, 0.74);
   border: 1px solid rgba(90, 160, 255, 0.18);
   border-radius: 16px;
   box-shadow: 0 24px 70px -28px rgba(0, 0, 0, 0.85);
@@ -170,6 +173,12 @@ h1 span {
   letter-spacing: 0.5px;
   text-shadow: 0 2px 22px rgba(90, 160, 255, 0.35);
 }
+.screen-card p.sub { max-width: 30ch; }
+.screen-card p.hint {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
 
 .title-art {
   display: block;
@@ -178,17 +187,26 @@ h1 span {
   height: auto;
 }
 
+.divider {
+  width: 72%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .keys {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
-  margin-top: 2px;
 }
 .key-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
+  padding: 5px 10px 5px 7px;
 }
 .key-chip kbd {
   font: inherit;

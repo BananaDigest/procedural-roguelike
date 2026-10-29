@@ -18,7 +18,9 @@ export class Screens {
       this.h('«А Тебе?»', "brand"),
       this.p("Mouse in the Market — a new market every run", "sub"),
       this.controls(),
+      this.divider(),
       this.seedRow(onStart),
+      this.p("Same seed → same market", "hint"),
     ]);
   }
 
@@ -75,26 +77,45 @@ export class Screens {
   }
 
   private artCheese(ctx: CanvasRenderingContext2D, X: number, Y: number): void {
-    const s = 46;
-    const p1 = [X - s * 0.5, Y + s * 0.32] as const;
-    const p2 = [X + s * 0.5, Y + s * 0.32] as const;
-    const p3 = [X, Y - s * 0.42] as const;
+    const s = 48;
+    const ax = X, ay = Y - s * 0.44; // apex (top)
+    const blx = X - s * 0.5, bly = Y + s * 0.34; // bottom-left
+    const brx = X + s * 0.5, bry = Y + s * 0.34; // bottom-right
+    const wedge = () => {
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(brx, bry);
+      ctx.lineTo(blx, bly);
+      ctx.closePath();
+    };
+    // body: vertical gradient + soft golden glow
     ctx.save();
-    ctx.shadowColor = "rgba(242,183,5,0.55)";
+    ctx.shadowColor = "rgba(242,183,5,0.5)";
     ctx.shadowBlur = 16;
-    ctx.fillStyle = "#f2b705";
-    ctx.beginPath();
-    ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]);
-    ctx.closePath(); ctx.fill();
+    const grad = ctx.createLinearGradient(0, ay, 0, bly);
+    grad.addColorStop(0, "#ffd96b");
+    grad.addColorStop(1, "#e8a606");
+    ctx.fillStyle = grad;
+    ctx.lineJoin = "round";
+    wedge(); ctx.fill();
     ctx.restore();
-    ctx.strokeStyle = "#b5850a"; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]);
-    ctx.closePath(); ctx.stroke();
-    ctx.fillStyle = "#d9a92a";
-    ctx.beginPath(); ctx.arc(X - 5, Y + 7, 2.4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(X + 6, Y + 2, 1.9, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(X - 1, Y - 4, 1.5, 0, Math.PI * 2); ctx.fill();
+    // rind outline
+    ctx.strokeStyle = "#a9790a"; ctx.lineWidth = 1.5; ctx.lineJoin = "round";
+    wedge(); ctx.stroke();
+    // left-edge highlight
+    ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ax + 1, ay + 4); ctx.lineTo(blx + 3, bly - 3); ctx.stroke();
+    // holes with depth (shadow body + small highlight)
+    const holes: [number, number, number][] = [
+      [-0.12, 0.14, 0.085], [0.11, 0.07, 0.06], [-0.02, -0.06, 0.045], [0.17, 0.2, 0.045],
+    ];
+    for (const [hx, hy, hr] of holes) {
+      const cxh = X + hx * s, cyh = Y + hy * s, r = hr * s;
+      ctx.fillStyle = "#c6880a";
+      ctx.beginPath(); ctx.arc(cxh, cyh, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.beginPath(); ctx.arc(cxh - r * 0.3, cyh - r * 0.3, r * 0.4, 0, Math.PI * 2); ctx.fill();
+    }
   }
 
   private controls(): HTMLElement {
@@ -113,6 +134,12 @@ export class Screens {
       wrap.appendChild(chip);
     }
     return wrap;
+  }
+
+  private divider(): HTMLElement {
+    const d = document.createElement("div");
+    d.className = "divider";
+    return d;
   }
 
   gameOver(score: number, onRestart: () => void): void {
@@ -203,7 +230,7 @@ export class Screens {
     row.className = "seed-row";
     const input = document.createElement("input");
     input.type = "text";
-    input.placeholder = "seed (optional)";
+    input.placeholder = "seed — empty = random";
     input.inputMode = "numeric";
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") onStart(input.value.trim());
