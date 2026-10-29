@@ -32,6 +32,15 @@ h1 span {
 }
 
 #stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+  line-height: 0;
+}
+
+#game-wrap {
   position: relative;
   line-height: 0;
 }
@@ -40,9 +49,23 @@ h1 span {
   background: #000;
   border-radius: 8px;
   image-rendering: pixelated;
-  max-width: 100%;
+  /* width/height are set from JS (Renderer.fit) to fit the window */
   box-shadow: 0 12px 40px -20px rgba(0, 0, 0, 0.9);
 }
+
+/* radar — fixed to the top-right of the screen, game-style, responsive */
+#minimap {
+  position: fixed;
+  top: clamp(8px, 1.6vw, 16px);
+  right: clamp(8px, 1.6vw, 16px);
+  /* square canvas (equal width/height attrs) → height follows aspect ratio */
+  width: clamp(104px, 20vmin, 168px);
+  height: auto;
+  z-index: 10;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.6));
+}
+#minimap[hidden] { display: none; }
 
 /* overlay screens (title / game over / win) */
 #overlay {
@@ -64,6 +87,8 @@ h1 span {
   padding: 24px 28px;
   text-align: center;
   line-height: 1.4;
+  /* same factor the canvas is scaled by (set from main.ts) */
+  transform: scale(var(--ui-scale, 1));
 }
 .screen-card h2 {
   font-size: 22px;

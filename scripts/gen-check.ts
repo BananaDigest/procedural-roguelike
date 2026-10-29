@@ -9,7 +9,8 @@
 import { generateLevel, roomCountForLevel } from "../src/generation/LevelChain.ts";
 import { levelToAscii } from "../src/generation/debug.ts";
 import { isRoomConnected } from "../src/generation/ConnectivityCheck.ts";
-import { APPROACH, ARENA, ROOM_H, ROOM_W } from "../src/generation/RoomGen.ts";
+import { APPROACH, ARENA, ROOM_H, ROOM_W, scaledSize } from "../src/generation/RoomGen.ts";
+import { VIEW } from "../src/config.ts";
 import { randomSeed, seedFromInput } from "../src/rng/Mulberry32.ts";
 import { type Room, Tile, type Vec2 } from "../src/core/types.ts";
 
@@ -26,6 +27,7 @@ if (args[0] === "--check") {
 }
 
 function runChecks(seeds: number): void {
+  const sizes = new Map<number, { minW: number; maxW: number; minH: number; maxH: number }>();
   const errors: string[] = [];
   const fail = (msg: string) => errors.length < 30 && errors.push(msg);
   let rooms = 0;
@@ -44,6 +46,12 @@ function runChecks(seeds: number): void {
 
       a.forEach((room, i) => {
         rooms++;
+        if (!room.isBossArena && !(level === 10)) {
+          const z = sizes.get(level) ?? { minW: 99, maxW: 0, minH: 99, maxH: 0 };
+          z.minW = Math.min(z.minW, room.w); z.maxW = Math.max(z.maxW, room.w);
+          z.minH = Math.min(z.minH, room.h); z.maxH = Math.max(z.maxH, room.h);
+          sizes.set(level, z);
+        }
         checkRoom(room, level, i, a.length, `${where} R${i}`, fail);
       });
     }
@@ -53,20 +61,24 @@ function runChecks(seeds: number): void {
     console.error(`FAILED (${errors.length}+ problems):\n` + errors.join("\n"));
     process.exit(1);
   }
+  for (const [lvl, z] of sizes) console.log(`L${lvl}: rooms ${z.minW}–${z.maxW} × ${z.minH}–${z.maxH}`);
   console.log(`OK — ${seeds} seeds × 10 levels, ${rooms} rooms: deterministic, all invariants hold.`);
 }
 
 function checkRoom(room: Room, level: number, i: number, count: number, where: string, fail: (m: string) => void) {
   const { w, h } = room;
+  const S = (n: number) => scaledSize(n, level); // 1.25× on levels 6–10 (config.ROOM_SCALE)
   if (room.tiles.length !== w * h) fail(`${where}: tiles.length`);
+  // must fit the viewport, leaving the top row for the HUD bar
+  if (w > VIEW.w || h > VIEW.h - 1) fail(`${where}: ${w}×${h} doesn't fit view ${VIEW.w}×${VIEW.h}`);
   if (room.isBossArena) {
-    if (w !== ARENA.w || h !== ARENA.h) fail(`${where}: arena size`);
+    if (w !== S(ARENA.w) || h !== S(ARENA.h)) fail(`${where}: arena size`);
     if (room.tiles.includes(Tile.Shelf)) fail(`${where}: shelf in arena`);
     if (room.enemies.length !== 1 || room.enemies[0].kind !== "boss") fail(`${where}: arena must hold only the boss`);
   } else {
-    if (w < ROOM_W.min || w > ROOM_W.max || h < ROOM_H.min || h > ROOM_H.max) fail(`${where}: size ${w}×${h}`);
+    if (w < S(ROOM_W.min) || w > S(ROOM_W.max) || h < S(ROOM_H.min) || h > S(ROOM_H.max)) fail(`${where}: size ${w}×${h}`);
     if (room.enemies.some((e) => e.kind === "boss")) fail(`${where}: boss outside arena`);
-    if (level === 10 && (w > APPROACH.w.max || h > APPROACH.h.max)) fail(`${where}: approach room too big`);
+    if (level === 10 && (w > S(APPROACH.w.max) || h > S(APPROACH.h.max))) fail(`${where}: approach room too big`);
     if (level === 10 && room.enemies.length > 2) fail(`${where}: approach room has ${room.enemies.length} enemies`);
   }
   if (room.isBossArena !== (level === 10 && i === count - 1)) fail(`${where}: isBossArena flag`);

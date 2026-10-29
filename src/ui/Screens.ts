@@ -16,7 +16,7 @@ export class Screens {
     this.panel([
       this.h('«А Тебе?»', "brand"),
       this.p("Mouse in the Market", "sub"),
-      this.p("WASD / arrows / numpad — move · R — new run"),
+      this.p("WASD / arrows / numpad — move · M — map · R — new run"),
       this.seedRow(onStart),
     ]);
   }

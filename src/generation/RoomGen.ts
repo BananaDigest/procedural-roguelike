@@ -11,6 +11,7 @@
 import { Mulberry32, roomSeed } from "../rng/Mulberry32.ts";
 import { type Enemy, type Exit, type Food, type Item, type Room, Tile, type Trap, type Vec2 } from "../core/types.ts";
 import { floodFill, isRoomConnected } from "./ConnectivityCheck.ts";
+import { ROOM_SCALE } from "../config.ts";
 import {
   ENEMY_HP,
   LAST_LEVEL,
@@ -29,15 +30,25 @@ export interface RoomSpec {
   count: number; // rooms in this level
 }
 
-/** Room size limits, in tiles, INCLUDING the wall frame. */
+/** Room size limits, in tiles, INCLUDING the wall frame (before scaledSize's level scaling). */
 export const ROOM_W = { min: 11, max: 18 };
 export const ROOM_H = { min: 8, max: 12 };
-/** Boss arena: bigger than any normal room, still fits the 20×14 viewport (+ HUD row). */
+/** Boss arena (level 10, base size): bigger than any normal room; scaled it must fit config.VIEW. */
 export const ARENA = { w: 20, h: 12 };
 /** Level 10, room 1 — the small quiet room before the arena. */
 export const APPROACH = { w: { min: 11, max: 13 }, h: { min: 8, max: 9 } };
 
 const MAX_ATTEMPTS = 20;
+
+/** Size multiplier for `level` (config.ROOM_SCALE: 1.25× on levels 6–10, else 1). */
+export function roomScaleFor(level: number): number {
+  return level >= ROOM_SCALE.fromLevel && level <= ROOM_SCALE.toLevel ? ROOM_SCALE.factor : 1;
+}
+
+/** A base room dimension (tiles) scaled for `level`, rounded to whole tiles. */
+export function scaledSize(n: number, level: number): number {
+  return Math.round(n * roomScaleFor(level));
+}
 
 export function generateRoom(spec: RoomSpec): Room {
   const seed = roomSeed(spec.baseSeed, spec.level, spec.index);
@@ -64,8 +75,8 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
   const approach = level === LAST_LEVEL && !arena;
   const sizeW = approach ? APPROACH.w : ROOM_W;
   const sizeH = approach ? APPROACH.h : ROOM_H;
-  const w = arena ? ARENA.w : rng.int(sizeW.min, sizeW.max);
-  const h = arena ? ARENA.h : rng.int(sizeH.min, sizeH.max);
+  const w = scaledSize(arena ? ARENA.w : rng.int(sizeW.min, sizeW.max), level);
+  const h = scaledSize(arena ? ARENA.h : rng.int(sizeH.min, sizeH.max), level);
   const tiles = new Array<Tile>(w * h).fill(Tile.Floor);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {

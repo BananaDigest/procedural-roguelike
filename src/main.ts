@@ -1,14 +1,15 @@
 /**
  * Entry point — screen flow, input, feedback, and wiring. Person C owns this.
  *
- * Runs the StubGame (fixture room) so it's playable end-to-end today.
- * INTEGRATION: swap `new StubGame()` for B's real Game (constructed with A's
- * generateLevel). Everything else stays.
+ * Integrated build: real game logic (B's GameImpl) driven by the real world
+ * generator (A's generateLevel), rendered by C's Renderer/HUD/Screens.
  */
-import { StubGame } from "./core/fixtures.ts";
 import { Game } from "./core/types.ts";
+import { GameImpl } from "./game/GameImpl.ts";
+import { generateLevel } from "./generation/LevelChain.ts";
 import { Renderer } from "./render/Renderer.ts";
 import { HUD } from "./ui/HUD.ts";
+import { Minimap } from "./ui/Minimap.ts";
 import { Screens } from "./ui/Screens.ts";
 import { hashSeed } from "./rng/Mulberry32.ts";
 
@@ -19,10 +20,14 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 const overlay = document.getElementById("overlay") as HTMLElement;
 const renderer = new Renderer(canvas);
 const hud = new HUD(canvas);
+const minimapCanvas = document.getElementById("minimap") as HTMLCanvasElement;
+const minimap = new Minimap(minimapCanvas); // fixed radar, top-right of the screen
 const screens = new Screens(overlay);
+const stage = document.getElementById("stage") as HTMLElement;
 
-const game: Game = new StubGame();
+const game: Game = new GameImpl(generateLevel);
 let started = false;
+let showMap = true;
 
 // --- feedback (damage flash + mouse blink) ---
 let flashAlpha = 0;
@@ -34,6 +39,7 @@ function render(): void {
   renderer.draw(game.state, { hideMouse: blink });
   renderer.flash(flashAlpha, flashColor);
   hud.draw(game.state);
+  if (showMap) minimap.draw(game.state);
 }
 
 function fxTick(): void {
@@ -63,6 +69,20 @@ function parseSeed(raw: string): number {
   return hashSeed(raw);
 }
 
+// --- window fit: canvas + overlay scale with the browser window ---
+const PAD_X = 16; // #app padding in style.css: 24px 16px
+const PAD_Y = 24;
+
+function fitToWindow(): void {
+  const top = stage.getBoundingClientRect().top + window.scrollY;
+  const scale = renderer.fit(window.innerWidth - 2 * PAD_X, window.innerHeight - top - PAD_Y);
+  stage.style.setProperty("--ui-scale", String(scale));
+  if (started) render();
+}
+
+window.addEventListener("resize", fitToWindow);
+fitToWindow();
+
 // --- screen flow ---
 function showTitle(): void {
   started = false;
@@ -72,6 +92,7 @@ function showTitle(): void {
 function startRun(seed: number): void {
   game.startWithSeed(seed);
   started = true;
+  minimapCanvas.hidden = !showMap;
   screens.hide();
   render();
 }
@@ -85,10 +106,14 @@ function syncPhase(): void {
 function doMove(dx: number, dy: number): void {
   if (!started || game.state.phase !== "playing") return;
   const prevHp = game.state.player.hp;
-  const prevEnemies = game.state.room.enemies.length;
+  const prevRoom = game.state.room;
+  const prevEnemies = prevRoom.enemies.length;
   game.movePlayer(dx, dy);
-  if (game.state.player.hp < prevHp) triggerFlash("#e2231a"); // took damage
-  else if (game.state.room.enemies.length < prevEnemies) triggerFlash("#ffffff"); // landed a bite
+  const s = game.state;
+  if (s.player.hp < prevHp) triggerFlash("#e2231a"); // took damage
+  else if (s.room === prevRoom && s.room.enemies.length < prevEnemies) {
+    triggerFlash("#ffffff"); // landed a bite (same room → an enemy died)
+  }
   render();
   syncPhase();
 }
@@ -104,6 +129,13 @@ const MOVES: Record<string, [number, number]> = {
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyR") {
     startRun(randomSeed());
+    e.preventDefault();
+    return;
+  }
+  if (started && (e.code === "KeyM" || e.code === "Tab")) {
+    showMap = !showMap;
+    minimapCanvas.hidden = !showMap;
+    if (showMap) minimap.draw(game.state);
     e.preventDefault();
     return;
   }

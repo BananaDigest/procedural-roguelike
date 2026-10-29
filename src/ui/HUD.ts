@@ -4,6 +4,7 @@
  */
 import { GameState } from "../core/types.ts";
 import { paletteForLevel } from "../render/palette.ts";
+import { TILE_SIZE, VIEW } from "../config.ts";
 
 export class HUD {
   private ctx: CanvasRenderingContext2D;
@@ -26,7 +27,8 @@ export class HUD {
     ctx.font = "12px ui-monospace, Menlo, Consolas, monospace";
     ctx.textBaseline = "top";
     ctx.fillStyle = "rgba(0,0,0,.5)";
-    ctx.fillRect(0, 0, ctx.canvas.width, 20);
+    // logical px — the Renderer's canvas transform scales it with everything else
+    ctx.fillRect(0, 0, VIEW.w * TILE_SIZE, 20);
     ctx.fillStyle = paletteForLevel(state.level).hudText;
     ctx.fillText(text, 8, 5);
     ctx.restore();
