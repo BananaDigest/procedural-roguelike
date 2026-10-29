@@ -9,6 +9,7 @@ import { GameImpl } from "./game/GameImpl.ts";
 import { generateLevel } from "./generation/LevelChain.ts";
 import { Renderer } from "./render/Renderer.ts";
 import { HUD } from "./ui/HUD.ts";
+import { Minimap } from "./ui/Minimap.ts";
 import { Screens } from "./ui/Screens.ts";
 import { hashSeed } from "./rng/Mulberry32.ts";
 
@@ -19,10 +20,13 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 const overlay = document.getElementById("overlay") as HTMLElement;
 const renderer = new Renderer(canvas);
 const hud = new HUD(canvas);
+const minimapCanvas = document.getElementById("minimap") as HTMLCanvasElement;
+const minimap = new Minimap(minimapCanvas); // fixed radar, top-right of the screen
 const screens = new Screens(overlay);
 
 const game: Game = new GameImpl(generateLevel);
 let started = false;
+let showMap = true;
 
 // --- feedback (damage flash + mouse blink) ---
 let flashAlpha = 0;
@@ -34,6 +38,7 @@ function render(): void {
   renderer.draw(game.state, { hideMouse: blink });
   renderer.flash(flashAlpha, flashColor);
   hud.draw(game.state);
+  if (showMap) minimap.draw(game.state);
 }
 
 function fxTick(): void {
@@ -72,6 +77,7 @@ function showTitle(): void {
 function startRun(seed: number): void {
   game.startWithSeed(seed);
   started = true;
+  minimapCanvas.hidden = !showMap;
   screens.hide();
   render();
 }
@@ -108,6 +114,13 @@ const MOVES: Record<string, [number, number]> = {
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyR") {
     startRun(randomSeed());
+    e.preventDefault();
+    return;
+  }
+  if (started && (e.code === "KeyM" || e.code === "Tab")) {
+    showMap = !showMap;
+    minimapCanvas.hidden = !showMap;
+    if (showMap) minimap.draw(game.state);
     e.preventDefault();
     return;
   }
