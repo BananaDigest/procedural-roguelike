@@ -87,6 +87,20 @@ export const FLY_DAMAGE = 2 as const;
 /** Spawn chance for a maggot (fly larva) per room (10–15%). */
 export const MAGGOT_SPAWN_CHANCE = 0.15 as const;
 
+// ── Demented Teammate ("Тімейт з деменцією") ──────────────────────
+
+/** Hit-points of the demented mouse teammate. */
+export const DEMENTED_MOUSE_HP = 13 as const;
+
+/** Damage dealt by the demented teammate per attack. */
+export const DEMENTED_MOUSE_DAMAGE = 3 as const;
+
+/** First level where the demented teammate can appear (level 7+). */
+export const DEMENTED_MOUSE_MIN_LEVEL = 7 as const;
+
+/** Spawn chance per room for the demented teammate starting at level 7. */
+export const DEMENTED_MOUSE_SPAWN_CHANCE = 0.5 as const;
+
 // ── Boss phases ───────────────────────────────────────────────────
 
 /** Boss HP fraction below which phase 2 activates (< 50 %). */

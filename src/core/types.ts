@@ -56,6 +56,13 @@ export interface Exit {
   pos: Vec2;
 }
 
+/** "Тімейт з деменцією" — brown crazy mouse ally/wildcard in rooms (level 7+). */
+export interface DementedMouse {
+  pos: Vec2;
+  hp: number;
+  maxHp: number;
+}
+
 /** One room = one screen. Produced by A, consumed by B & C. */
 export interface Room {
   w: number;
@@ -69,6 +76,7 @@ export interface Room {
   food: Food[];
   traps: Trap[];
   items: Item[];
+  dementedMouse?: DementedMouse | null;
   isBossArena: boolean;
 }
 

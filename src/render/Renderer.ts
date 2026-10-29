@@ -10,6 +10,7 @@
  * transitions → traps/poison → food/items → enemies → mouse.
  */
 import {
+  DementedMouse,
   EnemyKind,
   Fly,
   FoodKind,
@@ -105,6 +106,9 @@ export class Renderer {
     for (const f of r.food) this.food(px(f.pos.x), py(f.pos.y), f.kind);
     for (const it of r.items) this.item(px(it.pos.x), py(it.pos.y), it.kind);
     for (const en of r.enemies) this.enemy(px(en.pos.x), py(en.pos.y), en.kind);
+    if (r.dementedMouse && r.dementedMouse.hp > 0) {
+      this.dementedMouse(px(r.dementedMouse.pos.x), py(r.dementedMouse.pos.y), r.dementedMouse);
+    }
     if (!opts.hideMouse) this.mouse(px(state.player.pos.x), py(state.player.pos.y));
     for (const fly of state.flies) this.fly(px(fly.pos.x), py(fly.pos.y), fly);
   }
@@ -392,6 +396,156 @@ export class Renderer {
     ctx.closePath();
     ctx.fill();
   }
+
+  // --- demented teammate ("Тімейт з деменцією") ---
+  private dementedMouse(cx: number, cy: number, mouse: DementedMouse) {
+    const ctx = this.ctx;
+    const bx = cx + T * 0.15;
+    const by = cy + T * 0.15;
+    const bs = T * 0.7;
+
+    ctx.save();
+
+    // 1. Sticking tufts of hair (spiky wild hairs)
+    ctx.strokeStyle = "#3a200e";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(bx + bs * 0.35, by);
+    ctx.lineTo(bx + bs * 0.3, by - T * 0.15);
+    ctx.moveTo(bx + bs * 0.5, by);
+    ctx.lineTo(bx + bs * 0.52, by - T * 0.18);
+    ctx.moveTo(bx + bs * 0.65, by);
+    ctx.lineTo(bx + bs * 0.75, by - T * 0.13);
+    ctx.moveTo(bx, by + bs * 0.4);
+    ctx.lineTo(bx - T * 0.1, by + bs * 0.35);
+    ctx.stroke();
+
+    // 2. Ears
+    // Left ear (intact)
+    ctx.fillStyle = "#8a5832";
+    ctx.strokeStyle = "#4a2c14";
+    ctx.lineWidth = 1;
+    const lx = bx + 3;
+    ctx.beginPath();
+    ctx.moveTo(lx, by);
+    ctx.lineTo(lx - T * 0.11, by - T * 0.14);
+    ctx.lineTo(lx + T * 0.11, by - T * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Right ear (bitten notch!)
+    const rx = bx + bs - 3;
+    ctx.beginPath();
+    ctx.moveTo(rx, by);
+    ctx.lineTo(rx + T * 0.11, by - T * 0.12);
+    ctx.lineTo(rx + T * 0.04, by - T * 0.08); // bitten notch inward
+    ctx.lineTo(rx + T * 0.01, by - T * 0.15); // jagged edge
+    ctx.lineTo(rx - T * 0.08, by - T * 0.10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Inner ear
+    ctx.fillStyle = "#d47a6a";
+    ctx.beginPath();
+    ctx.arc(lx, by - T * 0.05, T * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3. Body (Brown mouse)
+    ctx.fillStyle = "#8a5832";
+    ctx.fillRect(bx, by, bs, bs);
+    ctx.strokeStyle = "#4a2c14";
+    ctx.strokeRect(bx + 0.5, by + 0.5, bs - 1, bs - 1);
+
+    // 4. Tail (crooked / twitchy)
+    ctx.strokeStyle = "#d48a60";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx + bs, cy + T * 0.7);
+    ctx.lineTo(cx + T * 0.95, cy + T * 0.75);
+    ctx.lineTo(cx + T * 1.05, cy + T * 0.65);
+    ctx.lineTo(cx + T * 1.0, cy + T * 0.5);
+    ctx.stroke();
+
+    // 5. Enlarged crazy / asymmetric eyes
+    // Left eye (huge sclera)
+    const leyex = cx + T * 0.35;
+    const leyey = cy + T * 0.42;
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#221105";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(leyex, leyey, T * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Left pupil (derpy, looking up-left)
+    ctx.fillStyle = "#000000";
+    ctx.beginPath();
+    ctx.arc(leyex - T * 0.04, leyey - T * 0.03, T * 0.045, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Right eye (smaller, looking down-right)
+    const reyex = cx + T * 0.65;
+    const reyey = cy + T * 0.40;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(reyex, reyey, T * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Right pupil
+    ctx.fillStyle = "#000000";
+    ctx.beginPath();
+    ctx.arc(reyex + T * 0.02, reyey + T * 0.03, T * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 6. Snout / Nose
+    ctx.fillStyle = "#e07a6a";
+    ctx.beginPath();
+    ctx.arc(cx + T * 0.5, cy + T * 0.60, T * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 7. Single white tooth sticking out
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#333333";
+    ctx.lineWidth = 0.8;
+    const toothX = cx + T * 0.46;
+    const toothY = cy + T * 0.65;
+    ctx.beginPath();
+    ctx.rect(toothX, toothY, T * 0.08, T * 0.12);
+    ctx.fill();
+    ctx.stroke();
+
+    // 8. Drool drop hanging from mouth
+    ctx.fillStyle = "rgba(100, 210, 255, 0.85)";
+    ctx.strokeStyle = "rgba(40, 160, 230, 0.9)";
+    ctx.lineWidth = 0.8;
+    const droolX = cx + T * 0.56;
+    const droolY = cy + T * 0.67;
+    ctx.beginPath();
+    ctx.moveTo(droolX, droolY);
+    ctx.lineTo(droolX, droolY + T * 0.12);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(droolX, droolY + T * 0.13, T * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 9. Health bar (if damaged)
+    if (mouse.hp < mouse.maxHp) {
+      const barW = T * 0.7;
+      const barH = 3;
+      const barX = cx + (T - barW) / 2;
+      const barY = cy + 2;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(barX, barY, barW, barH);
+      const fillW = Math.max(0, Math.min(barW, (barW * mouse.hp) / mouse.maxHp));
+      ctx.fillStyle = "#44dd66";
+      ctx.fillRect(barX, barY, fillW, barH);
+    }
+
+    ctx.restore();
+  }
+
 }
 
 export { T as TILE_SIZE, VW as VIEW_W, VH as VIEW_H };

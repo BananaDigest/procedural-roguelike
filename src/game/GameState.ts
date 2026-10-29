@@ -12,4 +12,5 @@ export * from "./Enemy.ts";
 export * from "./Boss.ts";
 export * from "./Player.ts";
 export * from "./Fly.ts";
+export * from "./DementedMouse.ts";
 
