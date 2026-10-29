@@ -462,6 +462,10 @@ export class GameImpl implements Game {
     this.state.roomCount = chain.length;
     this.state.room = newRoom;
 
+    // Toothpick buff expires on entering a new level
+    this.hasToothpick = false;
+    this.state.player.attack = PLAYER_BASE_ATTACK;
+
     // Place player at the arrival point.
     if (dir === "fwd") {
       // Entering from the start of the new level.
