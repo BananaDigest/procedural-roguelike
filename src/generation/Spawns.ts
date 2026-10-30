@@ -4,6 +4,9 @@
  */
 import { Mulberry32 } from "../rng/Mulberry32.ts";
 import type { EnemyKind, FoodKind, ItemKind } from "../core/types.ts";
+import { MAGGOT_SPAWN_CHANCE } from "../game/balance.ts";
+
+export { MAGGOT_SPAWN_CHANCE };
 
 export const LAST_LEVEL = 10;
 

@@ -65,6 +65,7 @@ export function fixtureState(): GameState {
     player: { pos: { ...room.entry }, hp: 14, maxHp: 20, attack: 4 },
     room,
     clouds: [{ x: 6, y: 4 }],
+    flies: [],
     phase: "playing",
   };
 }

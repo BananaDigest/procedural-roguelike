@@ -70,10 +70,22 @@ export const PREMIUM_FOOD_HEAL = 6 as const;
 /** Score awarded by premium food. */
 export const PREMIUM_FOOD_SCORE = 25 as const;
 
-// ── Items ─────────────────────────────────────────────────────────
+// ── Items & Weapons ───────────────────────────────────────────────
 
 /** Number of turns enemies are frozen after using an Energy Drink. */
 export const ENERGY_DRINK_TURNS = 3 as const;
+
+/** Maximum number of flies in the player's army. */
+export const MAX_FLIES = 5 as const;
+
+/** Hit-points of a fly companion. */
+export const FLY_HP = 4 as const;
+
+/** Damage dealt by a fly to adjacent enemies within 1 tile. */
+export const FLY_DAMAGE = 2 as const;
+
+/** Spawn chance for a maggot (fly larva) per room (10–15%). */
+export const MAGGOT_SPAWN_CHANCE = 0.15 as const;
 
 // ── Boss phases ───────────────────────────────────────────────────
 

@@ -29,8 +29,16 @@ import {
   TOOTHPICK_ATTACK_BONUS,
   ENERGY_DRINK_TURNS,
   TOTAL_LEVELS,
+  MAX_FLIES,
 } from "./balance.ts";
 import { createPlayer, tryMovePlayer } from "./Player.ts";
+import {
+  createFly,
+  moveFlies,
+  repositionFlies,
+  fliesAttackEnemies,
+  removeDeadFlies,
+} from "./Fly.ts";
 import {
   playerAttackEnemy,
   removeDeadEnemies,
@@ -156,6 +164,7 @@ export class GameImpl implements Game {
         isBossArena: false,
       },
       clouds: [],
+      flies: [],
       phase: "title",
     };
   }
@@ -244,6 +253,7 @@ export class GameImpl implements Game {
       player: createPlayer(room.entry),
       room,
       clouds: [],
+      flies: [],
       phase: "playing",
     };
   }
@@ -312,6 +322,15 @@ export class GameImpl implements Game {
         case "energy":
           this.energyTurnsLeft = ENERGY_DRINK_TURNS;
           break;
+        case "maggot":
+          if (this.state.flies.length < MAX_FLIES) {
+            this.state.flies.push(createFly(player.pos));
+          } else {
+            for (const f of this.state.flies) {
+              f.hp = f.maxHp;
+            }
+          }
+          break;
         case "bigcheese":
           this.state.phase = "win";
           return; // game won — skip further checks
@@ -363,6 +382,11 @@ export class GameImpl implements Game {
       this.state.room.isBossArena && this.bossState
         ? this.bossState.clouds.map((c) => ({ ...c.pos }))
         : [];
+
+    // Flies follow the player into the new room/level
+    if (this.state.flies.length > 0) {
+      repositionFlies(this.state.flies, this.state.player.pos, this.state.room);
+    }
 
     return true;
   }
@@ -467,14 +491,26 @@ export class GameImpl implements Game {
         0,
     );
 
+    // ── Fly companion turns (movement & attack) ───────────────
+    if (this.state.flies.length > 0) {
+      moveFlies(this.state.flies, player.pos, room, turnRng);
+      fliesAttackEnemies(this.state.flies, room);
+    }
+
     // ── Enemy turns ───────────────────────────────────────────
     const enemyAttacked = processEnemyTurns(
       room,
       player,
       turnRng,
       this.energyTurnsLeft > 0,
+      this.state.flies,
     );
     if (enemyAttacked) this.playerHitFlash = 3;
+
+    // Remove any flies defeated by enemies
+    if (this.state.flies.length > 0) {
+      this.state.flies = removeDeadFlies(this.state.flies);
+    }
 
     // ── Boss turn ─────────────────────────────────────────────
     if (this.bossState && room.isBossArena) {
