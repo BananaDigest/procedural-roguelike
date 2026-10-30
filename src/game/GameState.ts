@@ -11,4 +11,5 @@ export * from "./Combat.ts";
 export * from "./Enemy.ts";
 export * from "./Boss.ts";
 export * from "./Player.ts";
+export * from "./Fly.ts";
 

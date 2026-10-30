@@ -14,7 +14,7 @@
  * to the [0, maxHp] range where applicable.
  */
 
-import { Enemy, EnemyKind, Room, Player } from "../core/types.ts";
+import { Enemy, EnemyKind, Room, Player, Fly } from "../core/types.ts";
 import {
   TOOTHPICK_ATTACK_BONUS,
   CASHIER_DAMAGE,
@@ -90,6 +90,19 @@ export function playerAttackEnemy(
 export function enemyAttackPlayer(enemy: Enemy, player: Player): void {
   const dmg = enemyAttackDamage(enemy.kind);
   player.hp = Math.max(0, player.hp - dmg);
+}
+
+/**
+ * An adjacent enemy attacks a fly companion.
+ *
+ * @param enemy - The attacking enemy.
+ * @param fly   - The fly companion being hit (mutated: `hp` is reduced).
+ * @returns `true` if the fly died (hp <= 0).
+ */
+export function enemyAttackFly(enemy: Enemy, fly: Fly): boolean {
+  const dmg = enemyAttackDamage(enemy.kind);
+  fly.hp = Math.max(0, fly.hp - dmg);
+  return fly.hp <= 0;
 }
 
 // ── Hazard damage ────────────────────────────────────────────────

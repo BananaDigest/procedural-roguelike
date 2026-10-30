@@ -23,7 +23,7 @@ export type FoodKind =
   | "cheese" | "croissant" | "cookie" | "bread" | "sausage" // regular pool (levels 1–5)
   | "cake" | "sushi" | "shrimp" | "steak" | "chocolate"; // premium pool (levels 6–10)
 
-export type ItemKind = "toothpick" | "energy" | "bigcheese";
+export type ItemKind = "toothpick" | "energy" | "bigcheese" | "maggot";
 
 export interface Enemy {
   kind: EnemyKind;
@@ -82,6 +82,12 @@ export interface Player {
 }
 
 /** The whole live run. B owns and mutates this; C only reads it. */
+export interface Fly {
+  pos: Vec2;
+  hp: number;
+  maxHp: number;
+}
+
 export interface GameState {
   seed: number;
   level: number; // 1..10
@@ -92,6 +98,8 @@ export interface GameState {
   room: Room; // the current (visible) room
   /** Active poison-cloud tiles (boss fight). B fills during the fight; C renders. */
   clouds: Vec2[];
+  /** Player's fly companions army (max 5). */
+  flies: Fly[];
   phase: Phase;
 }
 

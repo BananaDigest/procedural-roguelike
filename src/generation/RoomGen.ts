@@ -18,6 +18,7 @@ import {
   isFastLevel,
   pickFood,
   rollPowerup,
+  MAGGOT_SPAWN_CHANCE,
   trapCountForLevel,
 } from "./Spawns.ts";
 
@@ -212,6 +213,14 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
     if (p) {
       const item: Item = { kind: power, pos: p };
       room.items.push(item);
+    }
+  }
+
+  // 8. maggot (fly larva) — 10–15% chance per room
+  if (!arena && rng.chance(MAGGOT_SPAWN_CHANCE)) {
+    const p = take(reachable);
+    if (p) {
+      room.items.push({ kind: "maggot", pos: p });
     }
   }
 
