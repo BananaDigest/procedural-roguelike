@@ -8,6 +8,10 @@ import {
   MAGGOT_SPAWN_CHANCE,
   maggotSpawnChanceForLevel,
   toothpickSpawnChanceForLevel,
+  CASHIER_HP,
+  LOADER_HP,
+  GUARD_HP,
+  BOSS_HP,
 } from "../game/balance.ts";
 
 export {
@@ -18,12 +22,12 @@ export {
 
 export const LAST_LEVEL = 10;
 
-/** Starting enemy HP (see «Баланс»). B may re-balance these in balance.ts. */
+/** Enemy HP — single source of truth lives in balance.ts (keeps game == catalog == boss phase). */
 export const ENEMY_HP: Record<EnemyKind, number> = {
-  cashier: 4,
-  loader: 4,
-  guard: 8,
-  boss: 40,
+  cashier: CASHIER_HP,
+  loader: LOADER_HP,
+  guard: GUARD_HP,
+  boss: BOSS_HP,
 };
 
 /** Levels 1–5 = regular market, 6–10 = premium «black» market. */
@@ -43,6 +47,9 @@ export function isFastLevel(level: number): boolean {
  * (RoomGen places the boss itself).
  */
 export function enemiesForLevel(level: number, rng: Mulberry32): EnemyKind[] {
+  // Levels 1–5 keep the original gentle intro (L1 is deliberately empty).
+  // From level 6 the curve is smoothed so the mid-game no longer cliffs into a
+  // 9-enemy swarm: ~4–5 → 4–6 → (L8 trades numbers for speed) → elite guards.
   switch (level) {
     case 1:
       return [];
@@ -52,20 +59,33 @@ export function enemiesForLevel(level: number, rng: Mulberry32): EnemyKind[] {
     case 4:
       return ["cashier", "loader"];
     case 5:
-    case 6:
       return ["cashier", "loader", "guard"];
-    case 7:
-    case 8: {
+    case 6: {
+      const out: EnemyKind[] = ["cashier", "loader", "guard", "guard"];
+      if (rng.int(0, 1)) out.push("cashier");
+      return out; // 4–5
+    }
+    case 7: {
+      // 4–6: one or two of each type
       const out: EnemyKind[] = [];
       for (const kind of ["cashier", "loader", "guard"] as const) {
-        const n = rng.int(1, 3);
+        const n = rng.int(1, 2);
         for (let i = 0; i < n; i++) out.push(kind);
       }
       return out;
     }
+    case 8: {
+      // Fewer bodies than L7 — but this is the fast level, so speed is the spike.
+      const out: EnemyKind[] = ["loader", "guard"];
+      const extra = rng.int(1, 2);
+      for (let i = 0; i < extra; i++) {
+        out.push(rng.pick(["cashier", "loader", "guard"] as const));
+      }
+      return out; // 3–4, fast
+    }
     case 9: {
       const n = rng.int(1, 2);
-      return new Array<EnemyKind>(n).fill("guard");
+      return new Array<EnemyKind>(n).fill("guard"); // elite fast guards before the boss
     }
     default: {
       // level 10, approach room — «затишшя перед бурею»

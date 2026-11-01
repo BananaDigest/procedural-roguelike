@@ -37,13 +37,19 @@ export const BOSS_DAMAGE = 5 as const;
 
 // ── Enemy HP ──────────────────────────────────────────────────────
 
-/** Hit-points of a Cashier enemy. */
+/**
+ * Enemy HP. Difficulty now comes from how MANY enemies a room holds
+ * (see enemiesForLevel), so per-enemy HP stays low to keep fights snappy
+ * rather than grindy.
+ */
+
+/** Hit-points of a Cashier enemy — weak wandering chip-damage fodder. */
 export const CASHIER_HP = 4 as const;
 
 /** Hit-points of a Loader enemy. */
 export const LOADER_HP = 4 as const;
 
-/** Hit-points of a Guard enemy. */
+/** Hit-points of a Guard enemy — the chaser. */
 export const GUARD_HP = 8 as const;
 
 /** Hit-points of the Boss. */
@@ -76,14 +82,27 @@ export const PREMIUM_FOOD_SCORE = 25 as const;
 /** Number of turns enemies are frozen after using an Energy Drink. */
 export const ENERGY_DRINK_TURNS = 3 as const;
 
-/** Maximum number of flies in the player's army. */
-export const MAX_FLIES = 5 as const;
+/** Base fly-army cap (levels 1–6). Grows in the premium levels — see maxFliesForLevel. */
+export const MAX_FLIES = 3 as const;
 
-/** Hit-points of a fly companion. */
-export const FLY_HP = 4 as const;
+/** Base fly hit-points (levels 1–6). Grows in the premium levels — see flyHpForLevel. */
+export const FLY_HP = 3 as const;
 
 /** Damage dealt by a fly to adjacent enemies within 1 tile. */
 export const FLY_DAMAGE = 2 as const;
+
+/**
+ * Fly-army cap by level (flow channel: support scales up as enemies get
+ * tougher). Levels 1–6 → 3, levels 7–10 → 5.
+ */
+export function maxFliesForLevel(level: number): number {
+  return level >= PREMIUM_START_LEVEL + 1 ? 5 : MAX_FLIES;
+}
+
+/** Fly hit-points by level: 3 early (1–6), 4 in the late premium levels (7–10). */
+export function flyHpForLevel(level: number): number {
+  return level >= PREMIUM_START_LEVEL + 1 ? 4 : FLY_HP;
+}
 
 /** Spawn chance for a maggot (fly larva) per room (10–15%). */
 export const MAGGOT_SPAWN_CHANCE = 0.15 as const;
