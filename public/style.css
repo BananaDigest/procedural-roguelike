@@ -139,16 +139,41 @@ h1 span {
 }
 .catalog-row .cat-text { min-width: 0; }
 .cat-icon { justify-self: center; }
+.cat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
 .cat-text strong {
-  display: block;
   color: var(--text);
   font-size: 14px;
-  margin-bottom: 3px;
 }
 .cat-text p {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.38;
+}
+.cat-stats {
+  display: flex;
+  gap: 6px;
+}
+.cat-stats .stat {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.cat-stats .hp {
+  color: #7ee29a;
+  background: rgba(68, 221, 102, 0.1);
+}
+.cat-stats .dmg {
+  color: #ff8f85;
+  background: rgba(226, 35, 26, 0.12);
 }
 .screen-card button.secondary {
   background: transparent;

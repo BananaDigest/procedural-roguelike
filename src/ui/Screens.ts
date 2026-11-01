@@ -2,16 +2,25 @@
  * Screens — title / game over / win overlays (DOM, over the canvas).
  * All text is English. Buttons + seed input are real DOM for accessibility.
  */
+import {
+  PLAYER_MAX_HP, PLAYER_BASE_ATTACK,
+  CASHIER_HP, CASHIER_DAMAGE,
+  LOADER_HP, LOADER_DAMAGE,
+  GUARD_HP, GUARD_DAMAGE,
+  BOSS_HP, BOSS_DAMAGE,
+  FLY_HP, FLY_DAMAGE,
+  DEMENTED_MOUSE_HP, DEMENTED_MOUSE_DAMAGE,
+} from "../game/balance.ts";
 
-/** Characters shown in the catalog (left icon, right name + funny blurb). */
-const ROSTER: { kind: string; name: string; desc: string }[] = [
-  { kind: "mouse", name: "The Mouse (you)", desc: "Small, hungry, and far too brave for a rodent. Will cross ten shops for one wheel of cheese." },
-  { kind: "cashier", name: "Cashier", desc: "Beeps at everything. Drifts down the aisles hunting a barcode that was never there." },
-  { kind: "loader", name: "Loader", desc: "Married to his box. Won't chase you — shelf 7 isn't going to restock itself." },
-  { kind: "guard", name: "Guard", desc: "Takes 'loss prevention' personally. Will pursue one (1) mouse across the entire store." },
-  { kind: "boss", name: "The Cleaner", desc: "Final boss. Mops first, asks questions never. Flings rat poison the instant you corner her." },
-  { kind: "fly", name: "Fly", desc: "Your buzzing little sidekick. Bites enemies so your paws stay clean." },
-  { kind: "demented", name: "Demented Mouse", desc: "A mouse that lost the plot. Shuffles in circles muttering about expired yogurt." },
+/** Characters shown in the catalog (icon, name, funny blurb, live HP/DMG from balance). */
+const ROSTER: { kind: string; name: string; desc: string; hp: number; dmg: number }[] = [
+  { kind: "mouse", name: "The Mouse (you)", desc: "Small, hungry, and far too brave for a rodent. Will cross ten shops for one wheel of cheese.", hp: PLAYER_MAX_HP, dmg: PLAYER_BASE_ATTACK },
+  { kind: "cashier", name: "Cashier", desc: "Beeps at everything. Drifts down the aisles hunting a barcode that was never there.", hp: CASHIER_HP, dmg: CASHIER_DAMAGE },
+  { kind: "loader", name: "Loader", desc: "Married to his box. Won't chase you — shelf 7 isn't going to restock itself.", hp: LOADER_HP, dmg: LOADER_DAMAGE },
+  { kind: "guard", name: "Guard", desc: "Takes 'loss prevention' personally. Will pursue one (1) mouse across the entire store.", hp: GUARD_HP, dmg: GUARD_DAMAGE },
+  { kind: "boss", name: "The Cleaner", desc: "Final boss. Mops first, asks questions never. Flings rat poison the instant you corner her.", hp: BOSS_HP, dmg: BOSS_DAMAGE },
+  { kind: "fly", name: "Fly", desc: "Your buzzing little sidekick. Bites enemies so your paws stay clean.", hp: FLY_HP, dmg: FLY_DAMAGE },
+  { kind: "demented", name: "Demented Mouse", desc: "A mouse that lost the plot. Shuffles in circles muttering about expired yogurt.", hp: DEMENTED_MOUSE_HP, dmg: DEMENTED_MOUSE_DAMAGE },
 ];
 
 export class Screens {
@@ -51,11 +60,24 @@ export class Screens {
       icon.classList.add("cat-icon");
       const txt = document.createElement("div");
       txt.className = "cat-text";
+      // header: name with the HP / DMG tags right beside it
+      const head = document.createElement("div");
+      head.className = "cat-head";
       const name = document.createElement("strong");
       name.textContent = c.name;
+      const stats = document.createElement("div");
+      stats.className = "cat-stats";
+      const hp = document.createElement("span");
+      hp.className = "stat hp";
+      hp.textContent = `HP ${c.hp}`;
+      const dmg = document.createElement("span");
+      dmg.className = "stat dmg";
+      dmg.textContent = `DMG ${c.dmg}`;
+      stats.append(hp, dmg);
+      head.append(name, stats);
       const desc = document.createElement("p");
       desc.textContent = c.desc;
-      txt.append(name, desc);
+      txt.append(head, desc);
       row.append(icon, txt);
       list.appendChild(row);
     }
@@ -177,11 +199,12 @@ export class Screens {
     return d;
   }
 
-  /** Pause modal — shown over the frozen game. One action: leave the run. */
-  pause(onExit: () => void): void {
+  /** Pause modal — shown over the frozen game: open the catalog, or leave the run. */
+  pause(onExit: () => void, onCatalog: () => void): void {
     this.panel([
       this.h("Paused"),
       this.button("Return to main menu", onExit),
+      this.button("Catalog", onCatalog, "secondary"),
       this.p("Esc — resume", "hint"),
     ]);
   }
