@@ -20,6 +20,7 @@ import { Fly, Vec2, Room, Enemy, isWalkable } from "../core/types.ts";
 import { Mulberry32 } from "../rng/Mulberry32.ts";
 import { FLY_HP, FLY_DAMAGE, MAX_FLIES } from "./balance.ts";
 import { removeDeadEnemies } from "./Combat.ts";
+import { emitAttack } from "./events.ts";
 
 /**
  * 8 relative offsets around a center cell (excluding (0,0)).
@@ -234,6 +235,7 @@ export function fliesAttackEnemies(
     }
 
     if (bestEnemy && bestEnemy.hp > 0) {
+      emitAttack(fly, bestEnemy.pos);
       bestEnemy.hp -= FLY_DAMAGE;
       hitCount++;
       if (bestEnemy.hp <= 0) {

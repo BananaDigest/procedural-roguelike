@@ -13,6 +13,8 @@ import { Screens } from "./ui/Screens.ts";
 import { Toast } from "./ui/Toast.ts";
 import { hashSeed } from "./rng/Mulberry32.ts";
 import { DEBUG_KILL_BOSS_KEY, DEBUG_LEVEL_SELECT, DEBUG_LEVEL_SELECT_KEY } from "./config.ts";
+import { Animator } from "./render/Animator.ts";
+import { drainGameEvents } from "./game/events.ts";
 
 /** Flip off to disable the G/H keys that preview the game-over / win screens. */
 const DEV_PREVIEW = true;
@@ -36,34 +38,50 @@ let levelSelectOpen = false;
 let paused = false;
 let showMap = true;
 
-// --- feedback (damage flash + mouse blink) ---
+// --- animation: visual state lives in the Animator; logic stays turn-based ---
+const animator = new Animator();
+/** at most one move waits while the current turn's animation plays */
+let queuedMove: [number, number] | null = null;
+
+/** Tell the animator what changed (call after every state change). */
+function syncAnim(): void {
+  animator.sync(game.state, drainGameEvents(), performance.now());
+}
+
+// --- feedback (screen flash; the mouse itself flashes red via the Animator) ---
 let flashAlpha = 0;
 let flashColor = "#e2231a";
-let fxFrame = 0;
+let lastFrame = performance.now();
+const FLASH_FADE_PER_MS = 0.05 / 16.7; // ≈ the old per-frame fade, now frame-rate independent
 
-function render(): void {
-  const blink = flashAlpha > 0 && fxFrame % 2 === 0;
-  renderer.draw(game.state, { hideMouse: blink });
+function drawFrame(now: number): void {
+  animator.update(game.state, now);
+  renderer.draw(game.state, { anim: animator, now });
   renderer.flash(flashAlpha, flashColor);
   hud.draw(game.state);
+}
+
+function render(): void {
+  drawFrame(performance.now());
   if (showMap) minimap.draw(game.state);
 }
 
-function fxTick(): void {
-  fxFrame++;
-  flashAlpha = Math.max(0, flashAlpha - 0.05);
-  render();
-  if (flashAlpha > 0) requestAnimationFrame(fxTick);
+/** One rAF loop draws every frame; turns happen only on input. */
+function loop(now: number): void {
+  flashAlpha = Math.max(0, flashAlpha - (now - lastFrame) * FLASH_FADE_PER_MS);
+  lastFrame = now;
+  if (queuedMove && !animator.isBusy(now)) {
+    const [dx, dy] = queuedMove;
+    queuedMove = null;
+    doMove(dx, dy);
+  }
+  if (started) drawFrame(now);
+  requestAnimationFrame(loop);
 }
 
 function triggerFlash(color: string): void {
   flashColor = color;
-  if (flashAlpha <= 0) {
-    flashAlpha = 0.5;
-    requestAnimationFrame(fxTick);
-  } else {
-    flashAlpha = 0.5;
-  }
+  flashAlpha = 0.5;
 }
 
 // --- seed parsing ---
@@ -105,6 +123,8 @@ function showTitle(): void {
 
 function startRun(seed: number): void {
   game.startWithSeed(seed);
+  queuedMove = null;
+  syncAnim();
   started = true;
   minimapCanvas.hidden = !showMap;
   pauseBtn.hidden = false;
@@ -158,6 +178,7 @@ function doMove(dx: number, dy: number): void {
   const prevRoom = game.state.room;
   const prevEnemies = prevRoom.enemies.length;
   game.movePlayer(dx, dy);
+  syncAnim();
   const s = game.state;
   if (s.player.hp < prevHp) triggerFlash("#e2231a"); // took damage
   else if (s.room === prevRoom && s.room.enemies.length < prevEnemies) {
@@ -176,6 +197,8 @@ function openLevelSelect(): void {
     const level = Number(raw);
     if (level < 1 || level > 10) return "Level must be 1–10";
     if (!game.jumpToLevel(level)) return "Can't change level right now";
+    queuedMove = null;
+    syncAnim();
     closeLevelSelect();
     return null;
   });
@@ -227,6 +250,7 @@ window.addEventListener("keydown", (e) => {
   // DEBUG: K kills the boss (level-10 arena only) — same feedback as a killing bite.
   if (DEBUG_LEVEL_SELECT && started && e.code === DEBUG_KILL_BOSS_KEY) {
     if (game.debugKillBoss()) {
+      syncAnim();
       triggerFlash("#ffffff");
       render();
       syncPhase();
@@ -254,12 +278,26 @@ window.addEventListener("keydown", (e) => {
   }
   const move = MOVES[e.code];
   if (move) {
-    doMove(move[0], move[1]);
     e.preventDefault();
+    // While this turn still animates: queue one move; a further press cuts the
+    // animation short, plays the queued move and queues itself — never sluggish.
+    const now = performance.now();
+    if (animator.isBusy(now)) {
+      if (queuedMove) {
+        animator.finish();
+        const [qx, qy] = queuedMove;
+        queuedMove = null;
+        doMove(qx, qy);
+      }
+      queuedMove = [move[0], move[1]];
+      return;
+    }
+    doMove(move[0], move[1]);
   }
 });
 
 showTitle();
+requestAnimationFrame(loop);
 
 // If the browser restores the page from the back/forward cache mid-run,
 // the script isn't re-run — force the title screen so a reload always resets.
