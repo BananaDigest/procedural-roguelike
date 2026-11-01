@@ -62,8 +62,8 @@ h1 span {
 /* top-right corner HUD: pause button + radar, stacked */
 #hud-corner {
   position: fixed;
-  top: clamp(8px, 1.6vw, 16px);
-  right: clamp(8px, 1.6vw, 16px);
+  top: clamp(8px, calc(10px * var(--ui-scale, 1)), 24px);
+  right: clamp(8px, calc(10px * var(--ui-scale, 1)), 24px);
   z-index: 10;
   display: flex;
   flex-direction: column;
@@ -102,7 +102,8 @@ h1 span {
 
 /* radar — responsive square, lives in #hud-corner */
 #minimap {
-  width: clamp(104px, 20vmin, 168px);
+  width: clamp(160px, calc(140px * var(--ui-scale, 1)), min(360px, 32vmin));
+  aspect-ratio: 1 / 1;
   height: auto;
   pointer-events: none;
   filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.6));
