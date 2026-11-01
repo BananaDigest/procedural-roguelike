@@ -38,12 +38,13 @@ export const SURROUNDING_DIRS: readonly Vec2[] = [
 
 /**
  * Create a new fly companion at the given position.
+ * `hp` defaults to the base FLY_HP; callers pass flyHpForLevel(level) to scale it.
  */
-export function createFly(pos: Vec2): Fly {
+export function createFly(pos: Vec2, hp: number = FLY_HP): Fly {
   return {
     pos: { ...pos },
-    hp: FLY_HP,
-    maxHp: FLY_HP,
+    hp,
+    maxHp: hp,
   };
 }
 

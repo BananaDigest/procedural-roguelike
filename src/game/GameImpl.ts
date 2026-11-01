@@ -29,7 +29,8 @@ import {
   TOOTHPICK_ATTACK_BONUS,
   ENERGY_DRINK_TURNS,
   TOTAL_LEVELS,
-  MAX_FLIES,
+  maxFliesForLevel,
+  flyHpForLevel,
 } from "./balance.ts";
 import { createPlayer, tryMovePlayer } from "./Player.ts";
 import {
@@ -355,21 +356,23 @@ export class GameImpl implements Game {
         case "energy":
           this.energyTurnsLeft = ENERGY_DRINK_TURNS;
           break;
-        case "maggot":
-          if (this.state.flies.length < MAX_FLIES) {
+        case "maggot": {
+          const flyCap = maxFliesForLevel(this.state.level);
+          if (this.state.flies.length < flyCap) {
             const occupied = new Set(this.state.flies.map((f) => `${f.pos.x},${f.pos.y}`));
             occupied.add(`${player.pos.x},${player.pos.y}`);
-            const slots = getFlySlots(player.pos, room, room.enemies, MAX_FLIES);
+            const slots = getFlySlots(player.pos, room, room.enemies, flyCap);
             const freeSlot =
               slots.find((s) => !occupied.has(`${s.x},${s.y}`)) ??
               slots[0] ?? { x: player.pos.x + 1, y: player.pos.y };
-            this.state.flies.push(createFly(freeSlot));
+            this.state.flies.push(createFly(freeSlot, flyHpForLevel(this.state.level)));
           } else {
             for (const f of this.state.flies) {
               f.hp = f.maxHp;
             }
           }
           break;
+        }
         case "bigcheese":
           this.state.phase = "win";
           return; // game won — skip further checks
