@@ -25,6 +25,7 @@ const renderer = new Renderer(canvas);
 const hud = new HUD(canvas);
 const minimapCanvas = document.getElementById("minimap") as HTMLCanvasElement;
 const minimap = new Minimap(minimapCanvas); // fixed radar, top-right of the screen
+const pauseBtn = document.getElementById("pause") as HTMLButtonElement;
 const screens = new Screens(overlay);
 const stage = document.getElementById("stage") as HTMLElement;
 const toast = new Toast(document.getElementById("game-wrap") as HTMLElement);
@@ -33,6 +34,8 @@ const game = new GameImpl(generateLevel);
 let started = false;
 /** DEBUG level-select box is open → game is paused, keys don't move the mouse. */
 let levelSelectOpen = false;
+/** Pause modal is open → game is frozen, keys don't move the mouse. */
+let paused = false;
 let showMap = true;
 
 // --- animation: visual state lives in the Animator; logic stays turn-based ---
@@ -108,7 +111,14 @@ fitToWindow();
 // --- screen flow ---
 function showTitle(): void {
   started = false;
-  screens.title((seed) => startRun(parseSeed(seed)));
+  minimapCanvas.hidden = true;
+  pauseBtn.hidden = true;
+  renderer.clear(); // wipe the frozen room so it doesn't show behind the menu
+
+  screens.title(
+    (seed) => startRun(parseSeed(seed)),
+    () => screens.catalog(showTitle, (kind) => renderer.makeIcon(kind)),
+  );
 }
 
 function startRun(seed: number): void {
@@ -117,15 +127,42 @@ function startRun(seed: number): void {
   syncAnim();
   started = true;
   minimapCanvas.hidden = !showMap;
+  pauseBtn.hidden = false;
   screens.hide();
   render();
 }
 
 function syncPhase(): void {
   const s = game.state;
-  if (s.phase === "gameover") screens.gameOver(s.score, () => startRun(randomSeed()));
-  else if (s.phase === "win") screens.win(s.score, s.level, () => startRun(randomSeed()));
+  if (s.phase === "gameover") {
+    pauseBtn.hidden = true;
+    minimapCanvas.hidden = true;
+    screens.gameOver(s.score, () => startRun(randomSeed()));
+  } else if (s.phase === "win") {
+    pauseBtn.hidden = true;
+    minimapCanvas.hidden = true;
+    screens.win(s.score, s.level, () => startRun(randomSeed()));
+  }
 }
+
+// --- pause modal ---
+function openPause(): void {
+  if (!started || game.state.phase !== "playing") return;
+  paused = true;
+  screens.pause(() => {
+    paused = false;
+    showTitle(); // the only action: abandon the run, back to the main menu
+  });
+}
+
+function closePause(): void {
+  paused = false;
+  screens.hide();
+  render();
+}
+
+// Pause / menu button → open the pause modal over the frozen game.
+pauseBtn.addEventListener("click", () => (paused ? closePause() : openPause()));
 
 /** Show «Cheese power!» the moment the bonus is granted (called after any action). */
 function announceCheeseBonus(wasApplied: boolean): void {
@@ -191,6 +228,20 @@ window.addEventListener("keydown", (e) => {
     }
     return;
   }
+  // While paused only Esc reaches us — it resumes (closes the modal).
+  if (paused) {
+    if (e.code === "Escape") {
+      closePause();
+      e.preventDefault();
+    }
+    return;
+  }
+  // Esc → open the pause modal.
+  if (started && game.state.phase === "playing" && e.code === "Escape") {
+    openPause();
+    e.preventDefault();
+    return;
+  }
   if (DEBUG_LEVEL_SELECT && started && game.state.phase === "playing" && e.code === DEBUG_LEVEL_SELECT_KEY) {
     openLevelSelect();
     e.preventDefault(); // don't type ` into the box
@@ -247,3 +298,9 @@ window.addEventListener("keydown", (e) => {
 
 showTitle();
 requestAnimationFrame(loop);
+
+// If the browser restores the page from the back/forward cache mid-run,
+// the script isn't re-run — force the title screen so a reload always resets.
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) showTitle();
+});

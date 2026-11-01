@@ -97,6 +97,11 @@ export class Renderer {
     return scale;
   }
 
+  /** Wipe the canvas to black — used when leaving a run so no frozen room shows behind the menu. */
+  clear(): void {
+    this.ctx.clearRect(0, 0, VW * T, VH * T);
+  }
+
   draw(state: GameState, opts: DrawOpts = {}): void {
     const p = paletteForLevel(state.level);
     const r = state.room;
@@ -279,7 +284,54 @@ export class Renderer {
     this.ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
   }
 
-  // --- hero ---
+  /**
+   * Render a single character to its own standalone canvas — used by the
+   * catalog so it shows the EXACT in-game art (same private sprite methods),
+   * not a look-alike. Full-health fake entities keep the health bars hidden.
+   */
+  makeIcon(kind: string): HTMLCanvasElement {
+    const box = Math.round(T * 1.9); // tile + margin for ears / tail / mop
+    const dpr = window.devicePixelRatio || 1;
+    const canvas = document.createElement("canvas");
+    canvas.width = box * dpr;
+    canvas.height = box * dpr;
+    canvas.style.width = `${box}px`;
+    canvas.style.height = `${box}px`;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.scale(dpr, dpr);
+      this.drawIconOn(ctx, kind, box);
+    }
+    return canvas;
+  }
+
+  /** Draw `kind` centered into `target` by temporarily borrowing the sprite methods. */
+  private drawIconOn(target: CanvasRenderingContext2D, kind: string, box: number): void {
+    const saved = this.ctx;
+    this.ctx = target;
+    const off = (box - T) / 2; // tile top-left so the sprite lands centered
+    const pos = { x: 0, y: 0 };
+    switch (kind) {
+      case "mouse":
+        this.mouse(off, off);
+        break;
+      case "fly":
+        this.fly(off, off, { pos, hp: 1, maxHp: 1 });
+        break;
+      case "demented":
+        this.dementedMouse(off, off, { pos, hp: 1, maxHp: 1 });
+        break;
+      case "cashier":
+      case "loader":
+      case "guard":
+      case "boss":
+        // hp:0 → healthBar() returns early, so no bar over the icon
+        this.enemy(off, off, { kind: kind as EnemyKind, pos, hp: 0, maxHp: 1, fast: false });
+        break;
+    }
+    this.ctx = saved;
+  }
+
   private mouse(cx: number, cy: number, tail = 0, blink = false) {
     const ctx = this.ctx;
     const bx = cx + T * 0.15, by = cy + T * 0.15, bs = T * 0.7;
