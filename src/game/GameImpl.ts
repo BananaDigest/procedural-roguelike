@@ -57,6 +57,7 @@ import {
   PoisonCloud,
 } from "./Boss.ts";
 import { CHEESE_BONUS_DIVIDER } from "../config.ts";
+import { emitAttack } from "./events.ts";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -234,6 +235,7 @@ export class GameImpl implements Game {
       room.dementedMouse.pos.y === ny
     ) {
       const dmg = playerAttackDamage(player, false);
+      emitAttack(player, room.dementedMouse.pos);
       room.dementedMouse.hp -= dmg;
       if (room.dementedMouse.hp <= 0) {
         room.dementedMouse = null;
@@ -544,9 +546,9 @@ export class GameImpl implements Game {
     this.state.roomCount = chain.length;
     this.state.room = newRoom;
 
-    // Toothpick buff expires on entering a new level
+    // Toothpick buff expires on entering a new level (the once-per-run cheese bonus stays)
     this.hasToothpick = false;
-    this.state.player.attack = PLAYER_BASE_ATTACK;
+    this.state.player.attack = PLAYER_BASE_ATTACK + this.cheeseBonus;
 
     // Place player at the arrival point.
     if (dir === "fwd") {

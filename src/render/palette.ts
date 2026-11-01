@@ -39,3 +39,6 @@ export const DARK: Palette = {
 export function paletteForLevel(level: number): Palette {
   return level <= 5 ? LIGHT : DARK;
 }
+
+/** The Cleaning Lady's eyes — always red, in every phase and state (blink lines too). */
+export const BOSS_EYE_COLOR = "#e2231a";

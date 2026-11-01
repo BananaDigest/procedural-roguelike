@@ -24,6 +24,7 @@ import {
   TRAP_DAMAGE,
   POISON_DAMAGE,
 } from "./balance.ts";
+import { emitAttack } from "./events.ts";
 
 // ── Damage helpers ───────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ export function playerAttackEnemy(
   hasToothpick: boolean,
 ): boolean {
   const dmg = playerAttackDamage(player, hasToothpick);
+  emitAttack(player, enemy.pos);
   enemy.hp -= dmg;
   return enemy.hp <= 0;
 }
@@ -89,6 +91,7 @@ export function playerAttackEnemy(
  */
 export function enemyAttackPlayer(enemy: Enemy, player: Player): void {
   const dmg = enemyAttackDamage(enemy.kind);
+  emitAttack(enemy, player.pos, true);
   player.hp = Math.max(0, player.hp - dmg);
 }
 
@@ -144,6 +147,7 @@ export function enemyAttackWithShield(
 
 export function enemyAttackFly(enemy: Enemy, fly: Fly): boolean {
   const dmg = enemyAttackDamage(enemy.kind);
+  emitAttack(enemy, fly.pos);
   fly.hp = Math.max(0, fly.hp - dmg);
   return fly.hp <= 0;
 }

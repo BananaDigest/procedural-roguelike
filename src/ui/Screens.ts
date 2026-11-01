@@ -2,6 +2,26 @@
  * Screens — title / game over / win overlays (DOM, over the canvas).
  * All text is English. Buttons + seed input are real DOM for accessibility.
  */
+import {
+  PLAYER_MAX_HP, PLAYER_BASE_ATTACK,
+  CASHIER_HP, CASHIER_DAMAGE,
+  LOADER_HP, LOADER_DAMAGE,
+  GUARD_HP, GUARD_DAMAGE,
+  BOSS_HP, BOSS_DAMAGE,
+  FLY_HP, FLY_DAMAGE,
+  DEMENTED_MOUSE_HP, DEMENTED_MOUSE_DAMAGE,
+} from "../game/balance.ts";
+
+/** Characters shown in the catalog (icon, name, funny blurb, live HP/DMG from balance). */
+const ROSTER: { kind: string; name: string; desc: string; hp: number; dmg: number }[] = [
+  { kind: "mouse", name: "The Mouse (you)", desc: "Small, hungry, and far too brave for a rodent. Will cross ten shops for one wheel of cheese.", hp: PLAYER_MAX_HP, dmg: PLAYER_BASE_ATTACK },
+  { kind: "cashier", name: "Cashier", desc: "Beeps at everything. Drifts down the aisles hunting a barcode that was never there.", hp: CASHIER_HP, dmg: CASHIER_DAMAGE },
+  { kind: "loader", name: "Loader", desc: "Married to his box. Won't chase you — shelf 7 isn't going to restock itself.", hp: LOADER_HP, dmg: LOADER_DAMAGE },
+  { kind: "guard", name: "Guard", desc: "Takes 'loss prevention' personally. Will pursue one (1) mouse across the entire store.", hp: GUARD_HP, dmg: GUARD_DAMAGE },
+  { kind: "boss", name: "The Cleaner", desc: "Final boss. Mops first, asks questions never. Flings rat poison the instant you corner her.", hp: BOSS_HP, dmg: BOSS_DAMAGE },
+  { kind: "fly", name: "Fly", desc: "Your buzzing little sidekick. Bites enemies so your paws stay clean.", hp: FLY_HP, dmg: FLY_DAMAGE },
+  { kind: "demented", name: "Demented Mouse", desc: "A mouse that lost the plot. Shuffles in circles muttering about expired yogurt.", hp: DEMENTED_MOUSE_HP, dmg: DEMENTED_MOUSE_DAMAGE },
+];
 
 export class Screens {
   constructor(private el: HTMLElement) {}
@@ -9,19 +29,59 @@ export class Screens {
   hide(): void {
     this.el.hidden = true;
     this.el.innerHTML = "";
+    document.body.classList.remove("modal-open");
   }
 
   /** onStart receives the raw seed string ("" = random). */
-  title(onStart: (seed: string) => void): void {
+  title(onStart: (seed: string) => void, onCatalog: () => void): void {
     this.panel([
       this.titleArt(),
       this.h('«А Тебе?»', "brand"),
-      this.p("Mouse in the Market — a new market every run", "sub"),
       this.controls(),
       this.divider(),
       this.seedRow(onStart),
+      this.button("Catalog", onCatalog, "secondary"),
       this.p("Same seed → same market", "hint"),
     ]);
+  }
+
+  /**
+   * Character catalog — left icon (1/3), right name + blurb (2/3).
+   * `makeIcon` draws the REAL in-game sprite so the catalog always matches
+   * what the player sees in the market.
+   */
+  catalog(onBack: () => void, makeIcon: (kind: string) => HTMLCanvasElement): void {
+    const list = document.createElement("div");
+    list.className = "catalog-list";
+    for (const c of ROSTER) {
+      const row = document.createElement("div");
+      row.className = "catalog-row";
+      const icon = makeIcon(c.kind);
+      icon.classList.add("cat-icon");
+      const txt = document.createElement("div");
+      txt.className = "cat-text";
+      // header: name with the HP / DMG tags right beside it
+      const head = document.createElement("div");
+      head.className = "cat-head";
+      const name = document.createElement("strong");
+      name.textContent = c.name;
+      const stats = document.createElement("div");
+      stats.className = "cat-stats";
+      const hp = document.createElement("span");
+      hp.className = "stat hp";
+      hp.textContent = `HP ${c.hp}`;
+      const dmg = document.createElement("span");
+      dmg.className = "stat dmg";
+      dmg.textContent = `DMG ${c.dmg}`;
+      stats.append(hp, dmg);
+      head.append(name, stats);
+      const desc = document.createElement("p");
+      desc.textContent = c.desc;
+      txt.append(head, desc);
+      row.append(icon, txt);
+      list.appendChild(row);
+    }
+    this.panel([this.h("Catalog"), list, this.button("Back", onBack, "secondary")], "wide");
   }
 
   // --- title decoration ---
@@ -38,9 +98,6 @@ export class Screens {
     if (!ctx) return c;
     ctx.scale(dpr, dpr);
 
-    // faint floor dots
-    ctx.fillStyle = "rgba(230,235,240,0.16)";
-    for (let i = 0; i < 9; i++) ctx.fillRect(26 + i * 25, Hh - 18, 2, 2);
     // trail of dots from the mouse toward the cheese
     ctx.fillStyle = "rgba(245,246,248,0.5)";
     for (let i = 0; i < 5; i++) {
@@ -142,6 +199,16 @@ export class Screens {
     return d;
   }
 
+  /** Pause modal — shown over the frozen game: open the catalog, or leave the run. */
+  pause(onExit: () => void, onCatalog: () => void): void {
+    this.panel([
+      this.h("Paused"),
+      this.button("Return to main menu", onExit),
+      this.button("Catalog", onCatalog, "secondary"),
+      this.p("Esc — resume", "hint"),
+    ]);
+  }
+
   gameOver(score: number, onRestart: () => void): void {
     this.panel([
       this.h("You got caught!"),
@@ -194,11 +261,12 @@ export class Screens {
   }
 
   // --- helpers ---
-  private panel(children: HTMLElement[]): void {
+  private panel(children: HTMLElement[], extraClass = ""): void {
     this.el.hidden = false;
     this.el.innerHTML = "";
+    document.body.classList.add("modal-open"); // lock background scroll while open
     const card = document.createElement("div");
-    card.className = "screen-card";
+    card.className = extraClass ? `screen-card ${extraClass}` : "screen-card";
     for (const c of children) card.appendChild(c);
     this.el.appendChild(card);
   }
@@ -217,10 +285,11 @@ export class Screens {
     return e;
   }
 
-  private button(label: string, onClick: () => void): HTMLElement {
+  private button(label: string, onClick: () => void, cls = ""): HTMLElement {
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = label;
+    if (cls) b.className = cls;
     b.addEventListener("click", onClick);
     return b;
   }

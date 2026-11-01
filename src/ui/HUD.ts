@@ -6,7 +6,7 @@
 import { GameState } from "../core/types.ts";
 import { paletteForLevel } from "../render/palette.ts";
 import { TILE_SIZE, VIEW } from "../config.ts";
-import { TOTAL_LEVELS } from "../game/balance.ts";
+import { TOTAL_LEVELS, TOOTHPICK_ATTACK_BONUS } from "../game/balance.ts";
 
 const H = 24; // bar height, logical px
 const PAD = 8;
@@ -21,7 +21,7 @@ export class HUD {
     this.ctx = ctx;
   }
 
-  draw(state: GameState): void {
+  draw(state: GameState, hasToothpick = false): void {
     const ctx = this.ctx;
     const W = VIEW.w * TILE_SIZE;
     const pal = paletteForLevel(state.level);
@@ -65,21 +65,21 @@ export class HUD {
     x += barW + 5;
     x = this.text(`${state.player.hp}/${state.player.maxHp}`, x, cy, ink) + 14;
 
-    // damage
+    // damage — with the toothpick, split it as base +bonus so the buff is visible
     x = this.text("DMG", x, cy, muted) + 5;
-    x = this.text(String(state.player.attack), x, cy, ink) + 14;
-
-    // cheese (score)
-    this.cheeseIcon(x, cy);
-    x += 12;
-    x = this.text(`x${state.score}`, x, cy, ink) + 14;
-
-    // flies (only if the player has any)
-    if (state.flies?.length) {
-      this.flyIcon(x, cy);
-      x += 10;
-      x = this.text(`x${state.flies.length}`, x, cy, ink) + 14;
+    if (hasToothpick) {
+      const base = state.player.attack - TOOTHPICK_ATTACK_BONUS;
+      x = this.text(String(base), x, cy, ink) + 6;
+      this.toothpickIcon(x, cy);
+      x += 8 + 6; // icon width + equal gap on each side → it sits centered
+      x = this.text(`+${TOOTHPICK_ATTACK_BONUS}`, x, cy, "#c89b6a") + 14;
+    } else {
+      x = this.text(String(state.player.attack), x, cy, ink) + 14;
     }
+
+    // food (score) — label + value, like HP / DMG
+    x = this.text("Food:", x, cy, muted) + 5;
+    x = this.text(String(state.score), x, cy, ink) + 14;
 
     // seed — right-aligned, muted
     ctx.textAlign = "right";
@@ -104,23 +104,16 @@ export class HUD {
     this.ctx.fill();
   }
 
-  private cheeseIcon(x: number, cy: number): void {
+  /** Small diagonal toothpick (8 px wide), vertically centered on `cy`. */
+  private toothpickIcon(x: number, cy: number): void {
     const ctx = this.ctx;
-    ctx.fillStyle = "#f2c84b";
+    ctx.strokeStyle = "#c89b6a";
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(x, cy + 4); ctx.lineTo(x + 9, cy + 4); ctx.lineTo(x + 4.5, cy - 4.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#d9a92a";
-    ctx.beginPath(); ctx.arc(x + 4, cy + 1.5, 1, 0, Math.PI * 2); ctx.fill();
-  }
-
-  private flyIcon(x: number, cy: number): void {
-    const ctx = this.ctx;
-    ctx.fillStyle = "rgba(230,235,240,0.75)"; // wings
-    ctx.beginPath(); ctx.ellipse(x + 1, cy - 1, 2.4, 1.4, -0.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x + 5, cy - 1, 2.4, 1.4, 0.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#2a2f38"; // body
-    ctx.beginPath(); ctx.ellipse(x + 3, cy + 1, 1.8, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.moveTo(x, cy + 3.5);
+    ctx.lineTo(x + 8, cy - 3.5);
+    ctx.stroke();
+    ctx.lineCap = "butt";
   }
 }
