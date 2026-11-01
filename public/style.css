@@ -56,10 +56,12 @@ h1 span {
 /* radar — fixed to the top-right of the screen, game-style, responsive */
 #minimap {
   position: fixed;
-  top: clamp(8px, 1.6vw, 16px);
-  right: clamp(8px, 1.6vw, 16px);
+  top: clamp(8px, calc(10px * var(--ui-scale, 1)), 24px);
+  right: clamp(8px, calc(10px * var(--ui-scale, 1)), 24px);
   /* square canvas (equal width/height attrs) → height follows aspect ratio */
-  width: clamp(104px, 20vmin, 168px);
+  /* 2x bigger, adaptive and proportional to window & UI scale */
+  width: clamp(160px, calc(140px * var(--ui-scale, 1)), min(360px, 32vmin));
+  aspect-ratio: 1 / 1;
   height: auto;
   z-index: 10;
   pointer-events: none;

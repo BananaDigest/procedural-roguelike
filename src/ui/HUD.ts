@@ -86,6 +86,8 @@ export class HUD {
     ctx.fillStyle = muted;
     ctx.fillText(`seed ${state.seed}`, W - PAD, cy);
 
+
+
     ctx.restore();
   }
 

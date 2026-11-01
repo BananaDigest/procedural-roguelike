@@ -12,7 +12,7 @@ import { Minimap } from "./ui/Minimap.ts";
 import { Screens } from "./ui/Screens.ts";
 import { Toast } from "./ui/Toast.ts";
 import { hashSeed } from "./rng/Mulberry32.ts";
-import { DEBUG_KILL_BOSS_KEY, DEBUG_LEVEL_SELECT, DEBUG_LEVEL_SELECT_KEY } from "./config.ts";
+import { DEBUG_KILL_BOSS_KEY, DEBUG_LEVEL_SELECT, DEBUG_LEVEL_SELECT_KEY, MIN_WINDOW_SCALE } from "./config.ts";
 
 /** Flip off to disable the G/H keys that preview the game-over / win screens. */
 const DEV_PREVIEW = true;
@@ -79,7 +79,18 @@ const PAD_Y = 24;
 
 function fitToWindow(): void {
   const top = stage.getBoundingClientRect().top + window.scrollY;
-  const scale = renderer.fit(window.innerWidth - 2 * PAD_X, window.innerHeight - top - PAD_Y);
+  const availW = window.innerWidth - 2 * PAD_X;
+  const availH = window.innerHeight - top - PAD_Y;
+  let gameAvailW = availW;
+  if (showMap && availW > 700) {
+    const estMapW = Math.min(360, Math.max(160, Math.min(availW, availH) * 0.25));
+    const safeW = availW - 2 * (estMapW + 20);
+    if (safeW >= 26 * 28 * MIN_WINDOW_SCALE) {
+      gameAvailW = safeW;
+    }
+  }
+  const scale = renderer.fit(gameAvailW, availH);
+  document.documentElement.style.setProperty("--ui-scale", String(scale));
   stage.style.setProperty("--ui-scale", String(scale));
   if (started) render();
 }
@@ -98,6 +109,7 @@ function startRun(seed: number): void {
   started = true;
   minimapCanvas.hidden = !showMap;
   screens.hide();
+  fitToWindow();
   render();
 }
 
@@ -147,6 +159,7 @@ function openLevelSelect(): void {
 function closeLevelSelect(): void {
   levelSelectOpen = false;
   screens.hide();
+  fitToWindow();
   render();
 }
 
@@ -191,6 +204,7 @@ window.addEventListener("keydown", (e) => {
   if (started && (e.code === "KeyM" || e.code === "Tab")) {
     showMap = !showMap;
     minimapCanvas.hidden = !showMap;
+    fitToWindow();
     if (showMap) minimap.draw(game.state);
     e.preventDefault();
     return;
