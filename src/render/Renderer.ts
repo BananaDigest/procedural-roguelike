@@ -106,7 +106,7 @@ export class Renderer {
     for (const c of state.clouds) this.poisonCloud(px(c.x), py(c.y));
     for (const f of r.food) this.food(px(f.pos.x), py(f.pos.y), f.kind);
     for (const it of r.items) this.item(px(it.pos.x), py(it.pos.y), it.kind);
-    for (const en of r.enemies) this.enemy(px(en.pos.x), py(en.pos.y), en.kind);
+    for (const en of r.enemies) this.enemy(px(en.pos.x), py(en.pos.y), en);
     if (r.dementedMouse && r.dementedMouse.hp > 0) {
       this.dementedMouse(px(r.dementedMouse.pos.x), py(r.dementedMouse.pos.y), r.dementedMouse);
     }
