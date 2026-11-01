@@ -544,9 +544,9 @@ export class GameImpl implements Game {
     this.state.roomCount = chain.length;
     this.state.room = newRoom;
 
-    // Toothpick buff expires on entering a new level
+    // Toothpick buff expires on entering a new level (the once-per-run cheese bonus stays)
     this.hasToothpick = false;
-    this.state.player.attack = PLAYER_BASE_ATTACK;
+    this.state.player.attack = PLAYER_BASE_ATTACK + this.cheeseBonus;
 
     // Place player at the arrival point.
     if (dir === "fwd") {

@@ -69,10 +69,9 @@ export class HUD {
     x = this.text("DMG", x, cy, muted) + 5;
     x = this.text(String(state.player.attack), x, cy, ink) + 14;
 
-    // cheese (score)
-    this.cheeseIcon(x, cy);
-    x += 12;
-    x = this.text(`x${state.score}`, x, cy, ink) + 14;
+    // food (score) — label + value, like HP / DMG
+    x = this.text("Food:", x, cy, muted) + 5;
+    x = this.text(String(state.score), x, cy, ink) + 14;
 
     // flies (only if the player has any)
     if (state.flies?.length) {
@@ -100,17 +99,6 @@ export class HUD {
     this.ctx.beginPath();
     this.ctx.roundRect(x, y, w, h, r);
     this.ctx.fill();
-  }
-
-  private cheeseIcon(x: number, cy: number): void {
-    const ctx = this.ctx;
-    ctx.fillStyle = "#f2c84b";
-    ctx.beginPath();
-    ctx.moveTo(x, cy + 4); ctx.lineTo(x + 9, cy + 4); ctx.lineTo(x + 4.5, cy - 4.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#d9a92a";
-    ctx.beginPath(); ctx.arc(x + 4, cy + 1.5, 1, 0, Math.PI * 2); ctx.fill();
   }
 
   private flyIcon(x: number, cy: number): void {
