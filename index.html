@@ -8,7 +8,6 @@
   </head>
   <body>
     <div id="app">
-      <h1>«А Тебе?» <span>— Mouse in the Market</span></h1>
       <div id="stage">
         <div id="game-wrap">
           <canvas id="game"></canvas>
@@ -16,7 +15,10 @@
         </div>
       </div>
     </div>
-    <canvas id="minimap" hidden></canvas>
+    <div id="hud-corner">
+      <button id="pause" type="button" aria-label="Menu" title="Menu (Esc)" hidden></button>
+      <canvas id="minimap" hidden></canvas>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

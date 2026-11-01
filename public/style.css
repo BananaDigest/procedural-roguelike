@@ -2,7 +2,9 @@
   --bg: #0d0f12;
   --text: #e4e7ea;
   --muted: #7c838c;
-  --accent: #5aa0ff;
+  --accent: #f2b705; /* market gold — focus rings, subtle highlights */
+  --brand: #e2231a; /* shop red — primary action (same red as the game) */
+  --tag: #ffd200; /* price-tag yellow */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -13,6 +15,10 @@ html, body {
   color: var(--text);
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
+
+/* while a modal (title / catalog / pause / …) is open, don't let the page
+   behind it scroll — otherwise its scrollbar reads as a scroll in the modal. */
+body.modal-open { overflow: hidden; }
 
 #app {
   display: flex;
@@ -53,29 +59,116 @@ h1 span {
   box-shadow: 0 12px 40px -20px rgba(0, 0, 0, 0.9);
 }
 
-/* radar — fixed to the top-right of the screen, game-style, responsive */
-#minimap {
+/* top-right corner HUD: pause button + radar, stacked */
+#hud-corner {
   position: fixed;
   top: clamp(8px, 1.6vw, 16px);
   right: clamp(8px, 1.6vw, 16px);
-  /* square canvas (equal width/height attrs) → height follows aspect ratio */
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none; /* children opt back in */
+}
+
+#pause {
+  pointer-events: auto;
+  position: relative;
+  width: 34px;
+  height: 34px;
+  color: var(--text);
+  background: rgba(13, 15, 20, 0.82);
+  border: 1px solid rgba(90, 160, 255, 0.28);
+  border-radius: 9px;
+  cursor: pointer;
+}
+#pause:hover { filter: brightness(1.2); }
+#pause:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#pause[hidden] { display: none; }
+#pause::before,
+#pause::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 12px;
+  background: currentColor;
+  border-radius: 1px;
+  transform: translateY(-50%);
+}
+#pause::before { left: 12px; }
+#pause::after { right: 12px; }
+
+/* radar — responsive square, lives in #hud-corner */
+#minimap {
   width: clamp(104px, 20vmin, 168px);
   height: auto;
-  z-index: 10;
   pointer-events: none;
   filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.6));
 }
 #minimap[hidden] { display: none; }
 
-/* overlay screens (title / game over / win) */
+/* --- catalog --- */
+/* Two columns so all characters fit without any scroll (page or list).
+   NB: the wide card must NOT inherit the --ui-scale transform — on large
+   windows that scale is >1 and would blow the modal past the viewport. */
+.screen-card.wide {
+  max-width: min(760px, 94vw);
+  max-height: 94vh;
+  transform: none;
+  animation: none;
+}
+.catalog-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  width: 100%;
+}
+.catalog-row {
+  display: grid;
+  grid-template-columns: auto 1fr; /* icon · text */
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 7px 11px;
+  min-width: 0; /* let text wrap instead of forcing the grid wider */
+}
+.catalog-row .cat-text { min-width: 0; }
+.cat-icon { justify-self: center; }
+.cat-text strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 3px;
+}
+.cat-text p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.38;
+}
+.screen-card button.secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.screen-card button.secondary:hover { filter: none; border-color: var(--accent); }
+
+/* overlay screens (title / game over / win / pause) — fixed to the viewport so
+   modals always center on screen and never push the page into a scroll. */
 #overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
+  overflow: hidden; /* a too-tall card is clipped, never scrolled */
   background: rgba(6, 7, 10, 0.72);
-  border-radius: 8px;
 }
 #overlay[hidden] { display: none; }
 
@@ -93,10 +186,6 @@ h1 span {
 .screen-card h2 {
   font-size: 22px;
   font-weight: 750;
-}
-.screen-card h2.brand {
-  font-size: 30px;
-  color: var(--accent);
 }
 .screen-card p {
   color: var(--muted);
@@ -134,10 +223,11 @@ h1 span {
 .screen-card button {
   font: inherit;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   cursor: pointer;
-  color: #071018;
-  background: var(--accent);
+  color: #fff;
+  background: var(--brand);
   border: 0;
   border-radius: 8px;
   padding: 10px 18px;
@@ -151,13 +241,15 @@ h1 span {
 
 /* --- polished title screen --- */
 .screen-card {
-  max-width: 340px;
-  padding: 22px 26px 24px;
+  max-width: 360px;
+  padding: 24px 26px 24px;
   gap: 11px;
-  background: rgba(13, 15, 20, 0.74);
-  border: 1px solid rgba(90, 160, 255, 0.18);
-  border-radius: 16px;
-  box-shadow: 0 24px 70px -28px rgba(0, 0, 0, 0.85);
+  background:
+    linear-gradient(180deg, rgba(226, 35, 26, 0.06), transparent 120px),
+    rgba(15, 16, 20, 0.9);
+  border: 1px solid rgba(255, 210, 0, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px -28px rgba(0, 0, 0, 0.9);
   animation: card-in 0.28s ease-out both;
 }
 @keyframes card-in {
@@ -168,10 +260,33 @@ h1 span {
   .screen-card { animation: none; }
 }
 
+/* brand title styled as a supermarket price-tag sticker */
 .screen-card h2.brand {
-  font-size: 34px;
+  position: relative;
+  align-self: center;
+  color: #1a1206;
+  font-size: 30px;
+  font-weight: 800;
   letter-spacing: 0.5px;
-  text-shadow: 0 2px 22px rgba(90, 160, 255, 0.35);
+  text-shadow: none;
+  background: linear-gradient(180deg, #ffe14d, var(--tag));
+  padding: 8px 20px 9px 26px;
+  border-radius: 7px;
+  transform: rotate(-2deg);
+  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+/* the little punch-hole of a price tag */
+.screen-card h2.brand::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1a1206;
+  transform: translateY(-50%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25);
 }
 .screen-card p.sub { max-width: 30ch; }
 .screen-card p.hint {
