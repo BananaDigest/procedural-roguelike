@@ -58,7 +58,7 @@ function drawFrame(now: number): void {
   animator.update(game.state, now);
   renderer.draw(game.state, { anim: animator, now });
   renderer.flash(flashAlpha, flashColor);
-  hud.draw(game.state);
+  hud.draw(game.state, game.hasToothpick);
 }
 
 function render(): void {
