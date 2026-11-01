@@ -22,6 +22,7 @@
 import { Room, Enemy, Vec2, Player, Fly, isWalkable } from "../core/types.ts";
 import { Mulberry32 } from "../rng/Mulberry32.ts";
 import { enemyAttackDamage, enemyAttackFly, enemyAttackWithShield } from "./Combat.ts";
+import { emitAttack } from "./events.ts";
 
 // ── Geometry helpers ─────────────────────────────────────────────────────────
 
@@ -215,6 +216,7 @@ function stepEnemy(
     room.dementedMouse.hp > 0 &&
     isAdjacent(enemy.pos, room.dementedMouse.pos)
   ) {
+    emitAttack(enemy, room.dementedMouse.pos);
     room.dementedMouse.hp = Math.max(
       0,
       room.dementedMouse.hp - enemyAttackDamage(enemy.kind),

@@ -32,6 +32,7 @@ import {
 } from "./balance.ts";
 import { removeDeadEnemies } from "./Combat.ts";
 import { isAdjacent } from "./Enemy.ts";
+import { emitAttack } from "./events.ts";
 
 /** Cardinal direction offsets (N, S, W, E). */
 const CARDINAL_DIRS: readonly Vec2[] = [
@@ -62,6 +63,7 @@ export function dementedMouseAttackPlayer(
   flies?: Fly[],
 ): { hitFly: Fly | null; damage: number } {
   const dmg = DEMENTED_MOUSE_DAMAGE;
+  emitAttack(mouse, player.pos, true);
 
   if (flies && flies.length > 0) {
     const aliveFlies = flies.filter((f) => f.hp > 0);
@@ -94,10 +96,11 @@ export function dementedMouseAttackPlayer(
  * The demented mouse attacks an enemy.
  */
 export function dementedMouseAttackEnemy(
-  _mouse: DementedMouse,
+  mouse: DementedMouse,
   enemy: Enemy,
 ): boolean {
   const dmg = DEMENTED_MOUSE_DAMAGE;
+  emitAttack(mouse, enemy.pos);
   enemy.hp -= dmg;
   return enemy.hp <= 0;
 }

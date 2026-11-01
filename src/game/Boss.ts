@@ -45,6 +45,7 @@ import {
   BOSS_RATPOISON_CLOUDS_P2,
   BOSS_HP,
 } from "./balance.ts";
+import { emitGameEvent } from "./events.ts";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -177,6 +178,7 @@ export function processBossTurn(
     : BOSS_RATPOISON_CLOUDS_P1;
 
   if (bossState.turnCount % interval === 0) {
+    emitGameEvent({ type: "bossThrow", actor: boss });
     // First cloud always lands at the player's current position.
     bossState.clouds.push({
       pos: { x: player.pos.x, y: player.pos.y },
