@@ -24,7 +24,8 @@ import {
 } from "../core/types.ts";
 import { BOSS_EYE_COLOR, Palette, paletteForLevel } from "./palette.ts";
 import { ANIM, MIN_WINDOW_SCALE, TILE_SIZE, VIEW } from "../config.ts";
-import type { Animator, DementedFace, Pose } from "./Animator.ts";
+import { Animator } from "./Animator.ts";
+import type { DementedFace, Pose } from "./Animator.ts";
 
 const T = TILE_SIZE; // logical tile size, px
 const VW = VIEW.w;
@@ -61,6 +62,10 @@ export class Renderer {
   /** small offscreen buffer: a sprite is drawn here, tinted, then blitted back. */
   private fx = document.createElement("canvas");
   private fxCtx: CanvasRenderingContext2D;
+  /** catalog icons that animate themselves on one shared rAF loop. */
+  private iconAnim = new Animator();
+  private icons: { canvas: HTMLCanvasElement; kind: string; box: number }[] = [];
+  private iconLoop = 0;
 
   constructor(private canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");
@@ -285,9 +290,10 @@ export class Renderer {
   }
 
   /**
-   * Render a single character to its own standalone canvas — used by the
-   * catalog so it shows the EXACT in-game art (same private sprite methods),
-   * not a look-alike. Full-health fake entities keep the health bars hidden.
+   * A catalog icon: a standalone canvas that draws the EXACT in-game sprite
+   * (same private methods) and animates itself — idle breathing, blinking,
+   * tail sway, buzzing wings, the demented one's twitches. It drives its own
+   * shared rAF loop and stops automatically once it leaves the DOM.
    */
   makeIcon(kind: string): HTMLCanvasElement {
     const box = Math.round(T * 1.9); // tile + margin for ears / tail / mop
@@ -297,39 +303,81 @@ export class Renderer {
     canvas.height = box * dpr;
     canvas.style.width = `${box}px`;
     canvas.style.height = `${box}px`;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.scale(dpr, dpr);
-      this.drawIconOn(ctx, kind, box);
-    }
+    this.drawIconFrame(canvas, kind, box, 0); // first frame, before it's in the DOM
+    this.icons.push({ canvas, kind, box });
+    this.ensureIconLoop();
     return canvas;
   }
 
+  /** Redraw every live icon each frame; drop ones removed from the DOM; stop when none remain. */
+  private ensureIconLoop(): void {
+    if (this.iconLoop) return;
+    const tick = (now: number) => {
+      this.icons = this.icons.filter((ic) => ic.canvas.isConnected);
+      for (const ic of this.icons) this.drawIconFrame(ic.canvas, ic.kind, ic.box, now);
+      this.iconLoop = this.icons.length ? requestAnimationFrame(tick) : 0;
+    };
+    this.iconLoop = requestAnimationFrame(tick);
+  }
+
+  /** Clear an icon canvas and draw its animated sprite for time `now` (ms). */
+  private drawIconFrame(canvas: HTMLCanvasElement, kind: string, box: number, now: number): void {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, box, box);
+    this.drawIconOn(ctx, kind, box, now);
+  }
+
   /** Draw `kind` centered into `target` by temporarily borrowing the sprite methods. */
-  private drawIconOn(target: CanvasRenderingContext2D, kind: string, box: number): void {
+  private drawIconOn(target: CanvasRenderingContext2D, kind: string, box: number, now = 0): void {
     const saved = this.ctx;
     this.ctx = target;
     const off = (box - T) / 2; // tile top-left so the sprite lands centered
     const pos = { x: 0, y: 0 };
+    const a = this.iconAnim;
+    const blink = this.iconBlink(kind, now);
+
+    // idle breathing — gentle vertical scale about the feet (as in draw())
+    const footY = off + T * (kind === "boss" ? 1.0 : 0.9);
+    const breathY = 1 + ANIM.breath * (0.5 - 0.5 * Math.cos((2 * Math.PI * now) / ANIM.breathMs));
+    target.save();
+    target.translate(0, footY);
+    target.scale(1, breathY);
+    target.translate(0, -footY);
     switch (kind) {
       case "mouse":
-        this.mouse(off, off);
+        this.mouse(off, off, a.tailSway(now), blink);
         break;
       case "fly":
-        this.fly(off, off, { pos, hp: 1, maxHp: 1 });
+        this.fly(off, off, { pos, hp: 1, maxHp: 1 }, a.wingWidth(now));
         break;
       case "demented":
-        this.dementedMouse(off, off, { pos, hp: 1, maxHp: 1 });
+        this.dementedMouse(off, off, { pos, hp: 1, maxHp: 1 }, a.dementedFace(now), blink);
         break;
       case "cashier":
       case "loader":
       case "guard":
       case "boss":
-        // hp:0 → healthBar() returns early, so no bar over the icon
-        this.enemy(off, off, { kind: kind as EnemyKind, pos, hp: 0, maxHp: 1, fast: false });
+        // hp:1 — enemy() no longer draws its own bar, so the icon stays clean
+        this.enemy(off, off, { kind: kind as EnemyKind, pos, hp: 1, maxHp: 1, fast: false }, this.iconMop(kind, now), blink);
         break;
     }
+    target.restore();
     this.ctx = saved;
+  }
+
+  /** Periodic blink for catalog icons; the demented one blinks more, and kinds desync by phase. */
+  private iconBlink(kind: string, now: number): boolean {
+    const cycle = kind === "demented" ? 2200 : 3600;
+    const phase = kind.length * 500; // so they don't all blink in lockstep (or at t=0)
+    return (now + phase) % cycle < ANIM.blinkMs;
+  }
+
+  /** Gentle mop swing for the boss icon (radians). */
+  private iconMop(kind: string, now: number): number {
+    return kind === "boss" ? Math.sin((2 * Math.PI * now) / 1400) * 0.25 : 0;
   }
 
   private mouse(cx: number, cy: number, tail = 0, blink = false) {
