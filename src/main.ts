@@ -149,10 +149,18 @@ function syncPhase(): void {
 function openPause(): void {
   if (!started || game.state.phase !== "playing") return;
   paused = true;
-  screens.pause(() => {
-    paused = false;
-    showTitle(); // the only action: abandon the run, back to the main menu
-  });
+  showPauseModal();
+}
+
+/** (Re)draw the pause modal — its Catalog button returns here via Back. */
+function showPauseModal(): void {
+  screens.pause(
+    () => {
+      paused = false;
+      showTitle(); // abandon the run, back to the main menu
+    },
+    () => screens.catalog(showPauseModal, (kind) => renderer.makeIcon(kind)),
+  );
 }
 
 function closePause(): void {
