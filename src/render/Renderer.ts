@@ -135,7 +135,7 @@ export class Renderer {
 
     for (const e of r.exits) this.exit(px(e.pos.x), py(e.pos.y), e.kind, e.dir);
     for (const t of r.traps) this.trap(px(t.pos.x), py(t.pos.y));
-    for (const c of state.clouds) this.poisonCloud(px(c.x), py(c.y));
+    for (const c of state.clouds) this.poisonCloud(px(c.x), py(c.y), (c as any).active ?? true);
     for (const f of r.food) this.food(px(f.pos.x), py(f.pos.y), f.kind);
     // --- characters, at their visual poses ---
     const anim = opts.anim;
@@ -618,11 +618,42 @@ export class Renderer {
     ctx.beginPath(); ctx.moveTo(cx + T * 0.5, cy + T * 0.34); ctx.lineTo(cx + T * 0.64, cy + T * 0.62); ctx.lineTo(cx + T * 0.36, cy + T * 0.62); ctx.closePath(); ctx.fill();
   }
 
-  private poisonCloud(cx: number, cy: number) {
+  private poisonCloud(cx: number, cy: number, active = true) {
     const ctx = this.ctx;
-    ctx.fillStyle = "rgba(80,200,80,0.45)";
+    const X = cx + T / 2;
+    const Y = cy + T / 2;
+    if (!active) {
+      // Telegraph / warning (turn 0-1): arsenic dust cloud settling
+      ctx.fillStyle = "rgba(180, 225, 70, 0.26)";
+      ctx.beginPath();
+      ctx.arc(X, Y, T * 0.46, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Faint warning perimeter
+      ctx.strokeStyle = "rgba(190, 235, 60, 0.5)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(X, Y, T * 0.38, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      return;
+    }
+    // Active toxic cloud (turn 2+): thick billowing poisonous green mist
+    ctx.fillStyle = "rgba(50, 190, 70, 0.38)";
     ctx.beginPath();
-    ctx.arc(cx + T / 2, cy + T / 2, T * 0.45, 0, Math.PI * 2);
+    ctx.arc(X, Y, T * 0.52, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(70, 210, 80, 0.52)";
+    ctx.beginPath();
+    ctx.arc(X, Y, T * 0.36, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Toxic droplet highlight
+    ctx.fillStyle = "rgba(150, 245, 90, 0.4)";
+    ctx.beginPath();
+    ctx.arc(X - T * 0.08, Y - T * 0.08, T * 0.15, 0, Math.PI * 2);
     ctx.fill();
   }
 

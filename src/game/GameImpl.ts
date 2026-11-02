@@ -652,14 +652,19 @@ export class GameImpl implements Game {
 
     // ── Boss turn ─────────────────────────────────────────────
     if (this.bossState && room.isBossArena) {
+      const hpBeforeBoss = player.hp;
       const bossDefeated = processBossTurn(
         this.bossState,
         room,
         player,
         turnRng,
       );
+      if (player.hp < hpBeforeBoss) this.playerHitFlash = 3;
       this.poisonClouds = this.bossState.clouds;
-      this.state.clouds = this.bossState.clouds.map((c) => ({ ...c.pos }));
+      this.state.clouds = this.bossState.clouds.map((c) => ({
+        ...c.pos,
+        active: this.bossState!.turnCount - c.placedOnTurn >= 2,
+      }));
 
       if (bossDefeated) {
         // Spawn the Big Cheese near the arena centre.
