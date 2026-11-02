@@ -16,7 +16,6 @@ import {
   ENEMY_HP,
   LAST_LEVEL,
   enemiesForLevel,
-  isFastLevel,
   pickFood,
   rollPowerup,
   maggotSpawnChanceForLevel,
@@ -180,7 +179,8 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
   const reachable = (p: Vec2) => reach[key(p)];
 
   // 4. enemies — not right next to the entry, so arriving is never a free hit.
-  const fast = isFastLevel(level);
+  //    (Double-stepping is no longer a per-enemy flag; it's a per-turn roll in
+  //    processEnemyTurns, so every enemy spawns with fast:false.)
   const farFromEntry = (d: number) => (p: Vec2) =>
     reachable(p) && Math.max(Math.abs(p.x - room.entry.x), Math.abs(p.y - room.entry.y)) >= d;
 
@@ -192,12 +192,12 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
       boss = take((p) => Math.max(Math.abs(p.x - c.x), Math.abs(p.y - c.y)) <= r);
     }
     if (!boss) return null;
-    room.enemies.push({ kind: "boss", pos: boss, hp: ENEMY_HP.boss, maxHp: ENEMY_HP.boss, fast: true });
+    room.enemies.push({ kind: "boss", pos: boss, hp: ENEMY_HP.boss, maxHp: ENEMY_HP.boss, fast: false });
   } else {
     for (const kind of enemiesForLevel(level, rng)) {
       const p = take(farFromEntry(4)) ?? take(farFromEntry(2));
       if (!p) break; // room too crowded — fewer enemies is fine
-      const enemy: Enemy = { kind, pos: p, hp: ENEMY_HP[kind], maxHp: ENEMY_HP[kind], fast };
+      const enemy: Enemy = { kind, pos: p, hp: ENEMY_HP[kind], maxHp: ENEMY_HP[kind], fast: false };
       room.enemies.push(enemy);
     }
   }

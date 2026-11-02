@@ -243,18 +243,20 @@ function stepEnemy(
 /**
  * Run every living enemy's turn for the current room.
  *
- * Fast enemies (flagged via `enemy.fast`) execute **two** steps per player
- * turn.  If an enemy attacks on its first step it does **not** get a second
- * step.
+ * Each enemy that did NOT attack on its first step has a `doubleStepChance`
+ * probability of taking a bonus second step (replaces the old guaranteed
+ * "fast" double-step — see balance.doubleStepChanceForLevel). An enemy that
+ * attacks never gets a second step.
  *
  * When the Energy Drink effect is active (`energyActive === true`) all
  * enemies are frozen and the function returns immediately.
  *
- * @param room         - The current room containing the enemies.
- * @param player       - The player state (may be mutated by enemy attacks).
- * @param rng          - Seeded PRNG instance.
- * @param energyActive - Whether the Energy Drink freeze effect is in play.
- * @param flies        - Optional active fly companions (enemies can attack them).
+ * @param room             - The current room containing the enemies.
+ * @param player           - The player state (may be mutated by enemy attacks).
+ * @param rng              - Seeded PRNG instance.
+ * @param energyActive     - Whether the Energy Drink freeze effect is in play.
+ * @param flies            - Optional active fly companions (enemies can attack them).
+ * @param doubleStepChance - Per-enemy chance of a bonus second step (0 = never).
  * @returns `true` if **any** enemy attacked the player this round.
  */
 export function processEnemyTurns(
@@ -263,6 +265,7 @@ export function processEnemyTurns(
   rng: Mulberry32,
   energyActive: boolean,
   flies?: Fly[],
+  doubleStepChance = 0,
 ): boolean {
   if (energyActive) return false; // enemies are frozen during energy effect
 
@@ -277,8 +280,8 @@ export function processEnemyTurns(
       continue; // no second step after an attack
     }
 
-    // Fast enemies get a second step.
-    if (enemy.fast) {
+    // Small chance of a bonus second step (was the deterministic "fast" flag).
+    if (doubleStepChance > 0 && rng.chance(doubleStepChance)) {
       const attacked2 = stepEnemy(enemy, room, room.enemies, player, rng, flies);
       if (attacked2) anyAttacked = true;
     }

@@ -35,11 +35,6 @@ export function isPremium(level: number): boolean {
   return level >= 6;
 }
 
-/** From level 8 every enemy takes 2 steps per player turn. */
-export function isFastLevel(level: number): boolean {
-  return level >= 8;
-}
-
 /**
  * The progression table: which enemies ONE room of `level` gets.
  * Once a type appears it stays in the pool deeper (except level 9 — guards only).
@@ -75,17 +70,17 @@ export function enemiesForLevel(level: number, rng: Mulberry32): EnemyKind[] {
       return out;
     }
     case 8: {
-      // Fewer bodies than L7 — but this is the fast level, so speed is the spike.
+      // Fewer bodies than L7 — but from here enemies may double-step (15%).
       const out: EnemyKind[] = ["loader", "guard"];
       const extra = rng.int(1, 2);
       for (let i = 0; i < extra; i++) {
         out.push(rng.pick(["cashier", "loader", "guard"] as const));
       }
-      return out; // 3–4, fast
+      return out; // 3–4
     }
     case 9: {
       const n = rng.int(1, 2);
-      return new Array<EnemyKind>(n).fill("guard"); // elite fast guards before the boss
+      return new Array<EnemyKind>(n).fill("guard"); // elite guards before the boss
     }
     default: {
       // level 10, approach room — «затишшя перед бурею»

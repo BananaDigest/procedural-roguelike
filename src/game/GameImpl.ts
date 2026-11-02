@@ -31,6 +31,7 @@ import {
   TOTAL_LEVELS,
   maxFliesForLevel,
   flyHpForLevel,
+  doubleStepChanceForLevel,
 } from "./balance.ts";
 import { createPlayer, tryMovePlayer } from "./Player.ts";
 import {
@@ -621,6 +622,7 @@ export class GameImpl implements Game {
       turnRng,
       this.energyTurnsLeft > 0,
       this.state.flies,
+      doubleStepChanceForLevel(this.state.level),
     );
     if (player.hp < hpBefore) this.playerHitFlash = 3;
 
