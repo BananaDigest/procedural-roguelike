@@ -16,14 +16,13 @@ import {
   ENEMY_HP,
   LAST_LEVEL,
   enemiesForLevel,
-  isFastLevel,
   pickFood,
   rollPowerup,
   maggotSpawnChanceForLevel,
   trapCountForLevel,
 } from "./Spawns.ts";
-import { createDementedMouse } from "../game/DementedMouse.ts";
-import { DEMENTED_MOUSE_MIN_LEVEL, DEMENTED_MOUSE_SPAWN_CHANCE } from "../game/balance.ts";
+import { createWildMouse } from "../game/WildMouse.ts";
+import { WILD_MOUSE_MIN_LEVEL, WILD_MOUSE_SPAWN_CHANCE } from "../game/balance.ts";
 
 export interface RoomSpec {
   baseSeed: number;
@@ -100,7 +99,7 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
     food: [],
     traps: [],
     items: [],
-    dementedMouse: null,
+    wildMouse: null,
     isBossArena: arena,
   };
 
@@ -180,7 +179,8 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
   const reachable = (p: Vec2) => reach[key(p)];
 
   // 4. enemies — not right next to the entry, so arriving is never a free hit.
-  const fast = isFastLevel(level);
+  //    (Double-stepping is no longer a per-enemy flag; it's a per-turn roll in
+  //    processEnemyTurns, so every enemy spawns with fast:false.)
   const farFromEntry = (d: number) => (p: Vec2) =>
     reachable(p) && Math.max(Math.abs(p.x - room.entry.x), Math.abs(p.y - room.entry.y)) >= d;
 
@@ -192,12 +192,12 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
       boss = take((p) => Math.max(Math.abs(p.x - c.x), Math.abs(p.y - c.y)) <= r);
     }
     if (!boss) return null;
-    room.enemies.push({ kind: "boss", pos: boss, hp: ENEMY_HP.boss, maxHp: ENEMY_HP.boss, fast: true });
+    room.enemies.push({ kind: "boss", pos: boss, hp: ENEMY_HP.boss, maxHp: ENEMY_HP.boss, fast: false });
   } else {
     for (const kind of enemiesForLevel(level, rng)) {
       const p = take(farFromEntry(4)) ?? take(farFromEntry(2));
       if (!p) break; // room too crowded — fewer enemies is fine
-      const enemy: Enemy = { kind, pos: p, hp: ENEMY_HP[kind], maxHp: ENEMY_HP[kind], fast };
+      const enemy: Enemy = { kind, pos: p, hp: ENEMY_HP[kind], maxHp: ENEMY_HP[kind], fast: false };
       room.enemies.push(enemy);
     }
   }
@@ -239,11 +239,11 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
     }
   }
 
-  // 9. demented teammate ("Тімейт з деменцією") — 50% chance starting level 7
-  if (level >= DEMENTED_MOUSE_MIN_LEVEL && !arena && rng.chance(DEMENTED_MOUSE_SPAWN_CHANCE)) {
+  // 9. wild teammate ("Дика миша") — 50% chance starting level 7
+  if (level >= WILD_MOUSE_MIN_LEVEL && !arena && rng.chance(WILD_MOUSE_SPAWN_CHANCE)) {
     const p = take(reachable);
     if (p) {
-      room.dementedMouse = createDementedMouse(p);
+      room.wildMouse = createWildMouse(p);
     }
   }
 

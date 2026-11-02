@@ -84,9 +84,9 @@ export const ANIM = {
   blinkMs: 120,
   blinkMinMs: 2000,
   blinkMaxMs: 5000,
-  /** the demented teammate blinks more often, sometimes twice in a row */
-  dementedBlinkMinMs: 800,
-  dementedBlinkMaxMs: 2400,
+  /** the wild teammate blinks more often, sometimes twice in a row */
+  wildBlinkMinMs: 800,
+  wildBlinkMaxMs: 2400,
   doubleBlinkChance: 0.4,
   doubleBlinkGapMs: 170,
 
@@ -95,7 +95,7 @@ export const ANIM = {
   maggotWiggle: 0.06,
   maggotPickMs: 150,
 
-  /** demented teammate */
+  /** wild teammate */
   hairJitterMs: 100,
   hairJitter: 0.035,
   pupilMs: 700,

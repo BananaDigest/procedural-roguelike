@@ -31,6 +31,7 @@ import {
   TOTAL_LEVELS,
   maxFliesForLevel,
   flyHpForLevel,
+  doubleStepChanceForLevel,
 } from "./balance.ts";
 import { createPlayer, tryMovePlayer } from "./Player.ts";
 import {
@@ -48,7 +49,7 @@ import {
   pickUpFood,
   applyTrapDamage,
 } from "./Combat.ts";
-import { processDementedMouseTurn } from "./DementedMouse.ts";
+import { processWildMouseTurn } from "./WildMouse.ts";
 import { processEnemyTurns } from "./Enemy.ts";
 import {
   BossState,
@@ -80,8 +81,8 @@ function deepCloneRoom(room: Room): Room {
     food: room.food.map((f) => ({ ...f, pos: { ...f.pos } })),
     traps: room.traps.map((t) => ({ pos: { ...t.pos } })),
     items: room.items.map((i) => ({ ...i, pos: { ...i.pos } })),
-    dementedMouse: room.dementedMouse
-      ? { ...room.dementedMouse, pos: { ...room.dementedMouse.pos } }
+    wildMouse: room.wildMouse
+      ? { ...room.wildMouse, pos: { ...room.wildMouse.pos } }
       : null,
     isBossArena: room.isBossArena,
   };
@@ -230,16 +231,16 @@ export class GameImpl implements Game {
     }
 
     if (
-      room.dementedMouse &&
-      room.dementedMouse.hp > 0 &&
-      room.dementedMouse.pos.x === nx &&
-      room.dementedMouse.pos.y === ny
+      room.wildMouse &&
+      room.wildMouse.hp > 0 &&
+      room.wildMouse.pos.x === nx &&
+      room.wildMouse.pos.y === ny
     ) {
       const dmg = playerAttackDamage(player, false);
-      emitAttack(player, room.dementedMouse.pos);
-      room.dementedMouse.hp -= dmg;
-      if (room.dementedMouse.hp <= 0) {
-        room.dementedMouse = null;
+      emitAttack(player, room.wildMouse.pos);
+      room.wildMouse.hp -= dmg;
+      if (room.wildMouse.hp <= 0) {
+        room.wildMouse = null;
       }
       this.postPlayerAction();
       return;
@@ -621,6 +622,7 @@ export class GameImpl implements Game {
       turnRng,
       this.energyTurnsLeft > 0,
       this.state.flies,
+      doubleStepChanceForLevel(this.state.level),
     );
     if (player.hp < hpBefore) this.playerHitFlash = 3;
 
@@ -629,19 +631,19 @@ export class GameImpl implements Game {
       this.state.flies = removeDeadFlies(this.state.flies);
     }
 
-    // ── Demented teammate turn ───────────────────────────────
-    if (room.dementedMouse && room.dementedMouse.hp > 0) {
+    // ── Wild teammate turn ───────────────────────────────
+    if (room.wildMouse && room.wildMouse.hp > 0) {
       const hpBeforeMouse = player.hp;
-      processDementedMouseTurn(
-        room.dementedMouse,
+      processWildMouseTurn(
+        room.wildMouse,
         room,
         player,
         this.state.flies,
         turnRng,
       );
       if (player.hp < hpBeforeMouse) this.playerHitFlash = 3;
-      if (room.dementedMouse.hp <= 0) {
-        room.dementedMouse = null;
+      if (room.wildMouse.hp <= 0) {
+        room.wildMouse = null;
       }
       if (this.state.flies.length > 0) {
         this.state.flies = removeDeadFlies(this.state.flies);

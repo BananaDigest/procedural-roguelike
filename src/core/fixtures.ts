@@ -50,7 +50,7 @@ export function fixtureRoom(): Room {
     ],
     traps: [{ pos: { x: 6, y: 6 } }],
     items: [{ kind: "toothpick", pos: { x: 4, y: 3 } }],
-    dementedMouse: null,
+    wildMouse: null,
     isBossArena: false,
   };
 }

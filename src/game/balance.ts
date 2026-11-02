@@ -132,22 +132,40 @@ export function maggotSpawnChanceForLevel(level: number): number {
     : MAGGOT_SPAWN_CHANCE;
 }
 
-// ── Demented Teammate ("Тімейт з деменцією") ──────────────────────
+// ── Wild Teammate ("Дика миша") ──────────────────────
 
-/** Hit-points of the demented mouse teammate. */
-export const DEMENTED_MOUSE_HP = 13 as const;
+/** Hit-points of the wild mouse teammate. */
+export const WILD_MOUSE_HP = 13 as const;
 
-/** Damage dealt by the demented teammate per attack. */
-export const DEMENTED_MOUSE_DAMAGE = 3 as const;
+/** Damage dealt by the wild teammate per attack. */
+export const WILD_MOUSE_DAMAGE = 3 as const;
 
-/** First level where the demented teammate can appear (level 7+). */
-export const DEMENTED_MOUSE_MIN_LEVEL = 7 as const;
+/** First level where the wild teammate can appear (level 7+). */
+export const WILD_MOUSE_MIN_LEVEL = 7 as const;
 
-/** Spawn chance per room for the demented teammate starting at level 7. */
-export const DEMENTED_MOUSE_SPAWN_CHANCE = 0.5 as const;
+/** Spawn chance per room for the wild teammate starting at level 7. */
+export const WILD_MOUSE_SPAWN_CHANCE = 0.5 as const;
 
-/** Number of steps the demented teammate takes per player turn (fast: 2 steps per 1). */
-export const DEMENTED_MOUSE_STEPS_PER_TURN = 2 as const;
+/** Number of steps the wild teammate takes per player turn (fast: 2 steps per 1). */
+export const WILD_MOUSE_STEPS_PER_TURN = 2 as const;
+
+// ── Enemy movement ────────────────────────────────────────────────
+
+/**
+ * From this level enemies (and the boss) may occasionally take a bonus
+ * second step on their turn. Replaces the old guaranteed "fast" double-step:
+ * instead of EVERY enemy always moving twice from level 8, now each one has a
+ * small random chance — the threat stays without the relentless overwhelm.
+ */
+export const DOUBLE_STEP_MIN_LEVEL = 8 as const;
+
+/** Per-turn chance for an enemy (or the boss) to take that bonus second step. */
+export const DOUBLE_STEP_CHANCE = 0.15 as const;
+
+/** Double-step chance for a given level (0 before DOUBLE_STEP_MIN_LEVEL). */
+export function doubleStepChanceForLevel(level: number): number {
+  return level >= DOUBLE_STEP_MIN_LEVEL ? DOUBLE_STEP_CHANCE : 0;
+}
 
 // ── Boss phases ───────────────────────────────────────────────────
 

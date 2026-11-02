@@ -193,13 +193,13 @@ export function repositionFlies(
 }
 
 /**
- * Flies attack enemies within 1 block of the player (8 blocks around us)
- * or within 1 block of any fly.
- * Each fly deals FLY_DAMAGE (2).
+ * Flies attack — each living fly strikes a living enemy that is **adjacent to
+ * that fly** (Chebyshev ≤ 1, one block). A fly must actually be next to the
+ * enemy to bite it; no reaching across the room. Each fly deals FLY_DAMAGE.
  */
 export function fliesAttackEnemies(
   flies: Fly[],
-  playerPos: Vec2,
+  _playerPos: Vec2,
   room: Room,
 ): { hitCount: number; killedAny: boolean } {
   let hitCount = 0;
@@ -208,40 +208,24 @@ export function fliesAttackEnemies(
   const livingFlies = flies.filter((f) => f.hp > 0);
   if (livingFlies.length === 0) return { hitCount: 0, killedAny: false };
 
-  // Targets: living enemies in 8 blocks around the player OR in radius 1 of any fly
-  const targets = room.enemies.filter(
-    (e) =>
-      e.hp > 0 &&
-      (Math.max(Math.abs(e.pos.x - playerPos.x), Math.abs(e.pos.y - playerPos.y)) <= 1 ||
-        livingFlies.some((f) => isInFlyRadius(f.pos, e.pos))),
-  );
-
-  if (targets.length === 0) return { hitCount: 0, killedAny: false };
-
-  // Each living fly strikes the closest target
   for (const fly of livingFlies) {
-    let bestEnemy = targets[0];
-    let bestDist =
-      Math.abs(bestEnemy.pos.x - fly.pos.x) + Math.abs(bestEnemy.pos.y - fly.pos.y);
-
-    for (let i = 1; i < targets.length; i++) {
-      const e = targets[i];
-      if (e.hp <= 0) continue;
-      const d =
-        Math.abs(e.pos.x - fly.pos.x) + Math.abs(e.pos.y - fly.pos.y);
+    // closest living enemy within one block of THIS fly
+    let bestEnemy: Enemy | null = null;
+    let bestDist = Infinity;
+    for (const e of room.enemies) {
+      if (e.hp <= 0 || !isInFlyRadius(fly.pos, e.pos)) continue;
+      const d = Math.abs(e.pos.x - fly.pos.x) + Math.abs(e.pos.y - fly.pos.y);
       if (d < bestDist) {
         bestDist = d;
         bestEnemy = e;
       }
     }
 
-    if (bestEnemy && bestEnemy.hp > 0) {
+    if (bestEnemy) {
       emitAttack(fly, bestEnemy.pos);
       bestEnemy.hp -= FLY_DAMAGE;
       hitCount++;
-      if (bestEnemy.hp <= 0) {
-        killedAny = true;
-      }
+      if (bestEnemy.hp <= 0) killedAny = true;
     }
   }
 

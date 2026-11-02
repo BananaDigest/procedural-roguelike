@@ -102,8 +102,6 @@ h1 span {
 
 /* radar — responsive square, lives in #hud-corner */
 #minimap {
-  /* square canvas (equal width/height attrs) → height follows aspect ratio */
-  /* 2x bigger, adaptive and proportional to window & UI scale */
   width: clamp(160px, calc(140px * var(--ui-scale, 1)), min(360px, 32vmin));
   aspect-ratio: 1 / 1;
   height: auto;
