@@ -22,7 +22,7 @@ import {
   ItemKind,
   Tile,
 } from "../core/types.ts";
-import { BOSS_EYE_COLOR, Palette, paletteForLevel } from "./palette.ts";
+import { BOSS_EYE_COLOR, DARK, Palette, paletteForLevel } from "./palette.ts";
 import { ANIM, MIN_WINDOW_SCALE, TILE_SIZE, VIEW } from "../config.ts";
 import { Animator } from "./Animator.ts";
 import type { WildFace, Pose } from "./Animator.ts";
@@ -37,6 +37,9 @@ const ENEMY_COLOR: Record<EnemyKind, string> = {
   guard: "#2f3e6e",
   boss: "#9b4dca",
 };
+
+/** Soft pastels for the little product boxes stocked on shelving racks. */
+const PRODUCT_COLORS = ["#f2b8cb", "#f8cda6", "#b6e0cc", "#b3d4ec", "#ccbce6", "#f1e3a6", "#c2ddb4"];
 
 export interface DrawOpts {
   /** skip drawing the mouse this frame (used for the damage-blink effect). */
@@ -184,12 +187,13 @@ export class Renderer {
     ctx.fillStyle = p.fog;
     ctx.fillRect(0, 0, VW * T, VH * T);
 
-    // floor + shelves (walls stay fog)
+    // floor + shelving racks + box crates (walls stay fog)
     for (let y = 0; y < r.h; y++) {
       for (let x = 0; x < r.w; x++) {
         const t = r.tiles[y * r.w + x];
         if (t === Tile.Floor) this.floorTile(px(x), py(y), p);
-        else if (t === Tile.Shelf) this.shelf(px(x), py(y), p);
+        else if (t === Tile.Shelf) { this.floorTile(px(x), py(y), p); this.shelf(px(x), py(y), p, x * 73856 + y * 19349); }
+        else if (t === Tile.Crate) { this.floorTile(px(x), py(y), p); this.crate(px(x), py(y), p, x * 73856 + y * 19349); }
       }
     }
 
@@ -346,12 +350,84 @@ export class Renderer {
     this.ctx.fillStyle = p.dot;
     this.ctx.fillRect(cx + T / 2 - 1, cy + T / 2 - 1, 2, 2);
   }
-  private shelf(cx: number, cy: number, p: Palette) {
-    this.ctx.fillStyle = p.shelf;
-    this.ctx.fillRect(cx + 2, cy + 2, T - 4, T - 4);
-    this.ctx.strokeStyle = "rgba(0,0,0,.25)";
-    this.ctx.lineWidth = 1;
-    this.ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
+  /**
+   * A shelving-rack cell, drawn at 50% opacity so long aisles read softly over
+   * the floor. Inset only 1px so a run of them reads as one long unit; split
+   * into two stocked shelves with little grey product boxes whose shades vary
+   * by `seed` (stable per tile, so they don't flicker).
+   */
+  private shelf(cx: number, cy: number, p: Palette, seed: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = p === DARK ? 0.25 : 0.5; // fainter on the dark premium floors
+
+    // rack body
+    ctx.fillStyle = p.shelf;
+    ctx.fillRect(cx + 1, cy + 1, T - 2, T - 2);
+    // top highlight rail + dark frame
+    ctx.fillStyle = "rgba(255,255,255,.08)";
+    ctx.fillRect(cx + 1, cy + 1, T - 2, 2);
+    ctx.strokeStyle = "rgba(0,0,0,.3)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx + 1.5, cy + 1.5, T - 3, T - 3);
+    // two ledges of goods
+    const inset = 3, midY = cy + T / 2;
+    for (let row = 0; row < 2; row++) {
+      const ledgeY = row === 0 ? midY - 1 : cy + T - 3; // where goods stand on
+      const topY = row === 0 ? cy + 4 : midY + 1;
+      const boxes = 3;
+      const bw = (T - 2 * inset) / boxes;
+      for (let i = 0; i < boxes; i++) {
+        const hsh = (seed ^ (row * 101 + i * 37) * 2654435761) >>> 0;
+        const col = PRODUCT_COLORS[hsh % PRODUCT_COLORS.length];
+        const bh = (ledgeY - topY) * (0.6 + ((hsh >> 8) % 40) / 100); // 0.6–1.0 tall
+        ctx.fillStyle = col;
+        ctx.fillRect(cx + inset + i * bw + 0.5, ledgeY - bh, bw - 1, bh);
+      }
+      // the ledge the goods sit on
+      ctx.fillStyle = "rgba(0,0,0,.4)";
+      ctx.fillRect(cx + 1, ledgeY, T - 2, 1);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * A cardboard box/pallet crate sitting on the floor — brown carton with a
+   * lighter lid, flap seam and a strip of packing tape. `seed` nudges the hue
+   * a touch so stacked crates aren't identical. Drawn a little transparent so it
+   * sits at the same soft visual weight as the shelving racks (fainter on dark
+   * floors), rather than popping out brighter than everything else.
+   */
+  private crate(cx: number, cy: number, p: Palette, seed: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = p === DARK ? 0.42 : 0.6;
+    const m = 2.5, s = T - 2 * m; // box footprint
+    const bx = cx + m, by = cy + m;
+    const tint = (seed >>> 0) % 3; // three cardboard shades
+    const body = ["#b07a43", "#a9743d", "#b8814a"][tint];
+    const lid = ["#c69356", "#bf8c50", "#cd9a5d"][tint];
+    // drop shadow
+    ctx.fillStyle = "rgba(0,0,0,.18)";
+    ctx.fillRect(bx + 1.5, by + 2, s, s);
+    // box body
+    ctx.fillStyle = body;
+    ctx.fillRect(bx, by, s, s);
+    // lighter lid band across the top
+    ctx.fillStyle = lid;
+    ctx.fillRect(bx, by, s, s * 0.32);
+    // frame + flap seam down the lid
+    ctx.strokeStyle = "#7a5126";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, by + 0.5, s - 1, s - 1);
+    ctx.beginPath();
+    ctx.moveTo(bx, by + s * 0.32); ctx.lineTo(bx + s, by + s * 0.32); // lid seam
+    ctx.moveTo(bx + s / 2, by); ctx.lineTo(bx + s / 2, by + s * 0.32); // flap split
+    ctx.stroke();
+    // packing-tape strip
+    ctx.fillStyle = "rgba(226,214,183,.75)";
+    ctx.fillRect(bx + s * 0.4, by, s * 0.2, s);
+    ctx.restore();
   }
 
   /**

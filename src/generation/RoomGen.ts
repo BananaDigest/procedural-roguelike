@@ -86,8 +86,11 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
     }
   }
 
-  // 2. shelves (none in the arena — the boss fight needs open space)
-  if (!arena && withShelves) placeShelves(tiles, w, h, rng.int(0, 3), rng);
+  // 2. shelving aisles + a few box crates (none in the arena — the boss needs space)
+  if (!arena && withShelves) {
+    placeAisles(tiles, w, h, rng);
+    placeCrates(tiles, w, h, rng.int(1, 3), rng);
+  }
 
   const room: Room = {
     w,
@@ -267,18 +270,78 @@ function takeFar(
 }
 
 /**
- * 0–`n` free-standing shelves: straight runs of 2–4 tiles. A shelf never
- * touches a wall or another shelf (one tile of floor all around), so the
- * floor around shelves always stays one connected region.
+ * Supermarket shelving aisles: parallel single-tile runs along the room's
+ * longer axis, spaced by a 1–2 tile walkway. Each run leaves a floor corridor
+ * down both ends of the cross axis (cross = 1 and cross = C-2 stay floor), so
+ * every walkway is linked top-and-bottom and the floor is always one connected
+ * region — no reliance on the re-roll safety net. Each run also gets a gap or
+ * two so shoppers (and the greedy chasers) can cut across instead of snagging
+ * on a long wall. Small rooms fall back to a couple of short free shelves.
  */
-function placeShelves(tiles: Tile[], w: number, h: number, n: number, rng: Mulberry32): void {
+function placeAisles(tiles: Tile[], w: number, h: number, rng: Mulberry32): void {
+  const vertical = w >= h; // wide room → vertical aisle columns
+  const L = vertical ? w : h; // long axis: aisles repeat along it
+  const C = vertical ? h : w; // cross axis: each aisle runs along it
+  if (L < 9 || C < 6) {
+    placeFreeShelves(tiles, w, h, rng.int(1, 3), rng);
+    return;
+  }
+  const set = (along: number, cross: number) => {
+    const x = vertical ? along : cross;
+    const y = vertical ? cross : along;
+    tiles[y * w + x] = Tile.Shelf;
+  };
+  const step = rng.chance(0.5) ? 2 : 3; // walkway width 1 or 2
+  const cTop = 2, cBot = C - 3; // cross = 1 and C-2 kept as access corridors
+  const runLen = cBot - cTop + 1;
+  for (let a = 3; a <= L - 4; a += step) {
+    const gaps = new Set<number>();
+    if (runLen >= 4) {
+      const gapCount = runLen >= 8 ? 2 : 1;
+      for (let g = 0; g < gapCount; g++) gaps.add(cTop + 1 + rng.int(0, runLen - 3));
+    }
+    for (let c = cTop; c <= cBot; c++) if (!gaps.has(c)) set(a, c);
+  }
+}
+
+/**
+ * `n` box crates dropped in the open floor: a single box, a 1×2 / 2×1 pair, or
+ * a 2×2 stack. Each keeps one tile of floor all around (never touching a wall,
+ * a shelf, or another crate), so it can't seal off a region.
+ */
+function placeCrates(tiles: Tile[], w: number, h: number, n: number, rng: Mulberry32): void {
+  const shapes: [number, number][] = [[1, 1], [2, 1], [1, 2], [2, 2]];
+  for (let s = 0; s < n; s++) {
+    for (let tries = 0; tries < 30; tries++) {
+      const [cw, ch] = shapes[rng.int(0, shapes.length - 1)];
+      if (w - 4 < cw || h - 4 < ch) continue;
+      const x0 = rng.int(2, w - 3 - cw + 1);
+      const y0 = rng.int(2, h - 3 - ch + 1);
+      // reject if the 1-tile-dilated footprint touches any obstacle
+      let free = true;
+      for (let y = y0 - 1; y <= y0 + ch && free; y++) {
+        for (let x = x0 - 1; x <= x0 + cw; x++) {
+          if (tiles[y * w + x] !== Tile.Floor) { free = false; break; }
+        }
+      }
+      if (!free) continue;
+      for (let y = y0; y < y0 + ch; y++) for (let x = x0; x < x0 + cw; x++) tiles[y * w + x] = Tile.Crate;
+      break;
+    }
+  }
+}
+
+/**
+ * Fallback for rooms too small for aisles: 1–`n` short free-standing shelf
+ * runs (2–4 tiles) that never touch a wall or each other.
+ */
+function placeFreeShelves(tiles: Tile[], w: number, h: number, n: number, rng: Mulberry32): void {
   for (let s = 0; s < n; s++) {
     for (let tries = 0; tries < 30; tries++) {
       const horizontal = rng.chance(0.6);
       const len = rng.int(2, 4);
       const sw = horizontal ? len : 1;
       const sh = horizontal ? 1 : len;
-      // shelf cells live in [2, w-3] × [2, h-3] → a floor gap to the wall frame
       if (w - 4 < sw || h - 4 < sh) continue;
       const x0 = rng.int(2, w - 3 - sw + 1);
       const y0 = rng.int(2, h - 3 - sh + 1);
@@ -286,10 +349,7 @@ function placeShelves(tiles: Tile[], w: number, h: number, n: number, rng: Mulbe
       let free = true;
       for (let y = y0 - 1; y <= y0 + sh && free; y++) {
         for (let x = x0 - 1; x <= x0 + sw; x++) {
-          if (tiles[y * w + x] === Tile.Shelf) {
-            free = false;
-            break;
-          }
+          if (tiles[y * w + x] !== Tile.Floor) { free = false; break; }
         }
       }
       if (!free) continue;
