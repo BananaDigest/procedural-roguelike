@@ -53,7 +53,7 @@ export const LOADER_HP = 4 as const;
 export const GUARD_HP = 8 as const;
 
 /** Hit-points of the Boss. */
-export const BOSS_HP = 40 as const;
+export const BOSS_HP = 90 as const;
 
 // ── Hazards ───────────────────────────────────────────────────────
 

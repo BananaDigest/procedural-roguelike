@@ -11,6 +11,7 @@ import {
   FLY_HP, FLY_DAMAGE,
   WILD_MOUSE_HP, WILD_MOUSE_DAMAGE,
 } from "../game/balance.ts";
+import { drawMouse } from "../render/Renderer.ts";
 
 /** Characters shown in the catalog (icon, name, funny blurb, live HP/DMG from balance). */
 const ROSTER: { kind: string; name: string; desc: string; hp: number; dmg: number }[] = [
@@ -105,32 +106,11 @@ export class Screens {
       ctx.arc(92 + i * 15, Hh * 0.52, 1.6, 0, Math.PI * 2);
       ctx.fill();
     }
-    this.artMouse(ctx, 46, Hh * 0.52);
+    // The REAL in-game mouse sprite (single source of truth), centred at (46, Y).
+    const ms = 48;
+    drawMouse(ctx, 46 - ms / 2, Hh * 0.52 - ms / 2, ms);
     this.artCheese(ctx, 196, Hh * 0.5);
     return c;
-  }
-
-  private artMouse(ctx: CanvasRenderingContext2D, X: number, Y: number): void {
-    const s = 34, bx = X - s / 2, by = Y - s / 2;
-    ctx.fillStyle = "#f5f6f8";
-    ctx.strokeStyle = "#5a5f66";
-    ctx.lineWidth = 1.5;
-    for (const ex of [bx + 7, bx + s - 7]) {
-      ctx.beginPath();
-      ctx.moveTo(ex, by + 2); ctx.lineTo(ex - 6, by - 6); ctx.lineTo(ex + 6, by - 5);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-    }
-    ctx.beginPath(); ctx.roundRect(bx, by, s, s, 7); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#111111";
-    ctx.beginPath(); ctx.arc(X - 6, Y - 2, 2.4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(X + 6, Y - 2, 2.4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#ff9ec4";
-    ctx.beginPath(); ctx.arc(X, Y + 5, 2.6, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "#ff9ec4"; ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    ctx.moveTo(bx + s, Y + 6);
-    ctx.quadraticCurveTo(X + s * 0.85, Y + 6, X + s * 0.72, Y - 9);
-    ctx.stroke();
   }
 
   private artCheese(ctx: CanvasRenderingContext2D, X: number, Y: number): void {
