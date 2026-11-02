@@ -22,7 +22,7 @@ import {
   ItemKind,
   Tile,
 } from "../core/types.ts";
-import { BOSS_EYE_COLOR, Palette, paletteForLevel } from "./palette.ts";
+import { BOSS_EYE_COLOR, DARK, Palette, paletteForLevel } from "./palette.ts";
 import { ANIM, MIN_WINDOW_SCALE, TILE_SIZE, VIEW } from "../config.ts";
 import { Animator } from "./Animator.ts";
 import type { WildFace, Pose } from "./Animator.ts";
@@ -38,6 +38,9 @@ const ENEMY_COLOR: Record<EnemyKind, string> = {
   boss: "#9b4dca",
 };
 
+/** Soft pastels for the little product boxes stocked on shelving racks. */
+const PRODUCT_COLORS = ["#f2b8cb", "#f8cda6", "#b6e0cc", "#b3d4ec", "#ccbce6", "#f1e3a6", "#c2ddb4"];
+
 export interface DrawOpts {
   /** skip drawing the mouse this frame (used for the damage-blink effect). */
   hideMouse?: boolean;
@@ -52,6 +55,71 @@ const STILL = (x: number, y: number): Pose => ({ x, y, scale: 1, alpha: 1, tint:
 
 /** Where an enemy's feet are (fraction of T from the tile top) — idle breathing scales about it. */
 const enemyFoot = (en: Enemy) => (en.kind === "boss" ? 1.0 : 0.86);
+
+/**
+ * The white hero mouse — the single source of truth for its look, in-game and
+ * on the title screen. Draws inside a square of side `s` whose top-left is
+ * (cx, cy); `tail` sways the tail, `blink` closes the eyes to lines.
+ */
+export function drawMouse(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  s: number,
+  tail = 0,
+  blink = false,
+): void {
+  const bx = cx + s * 0.15, by = cy + s * 0.15, bs = s * 0.7;
+  ctx.fillStyle = "#f5f6f8";
+  ctx.strokeStyle = "#5a5f66";
+  ctx.lineWidth = 1;
+  for (const ex of [bx + 3, bx + bs - 3]) {
+    ctx.beginPath();
+    ctx.moveTo(ex, by);
+    ctx.lineTo(ex - s * 0.11, by - s * 0.14);
+    ctx.lineTo(ex + s * 0.11, by - s * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#f5f6f8";
+  ctx.fillRect(bx, by, bs, bs);
+  ctx.strokeRect(bx + 0.5, by + 0.5, bs - 1, bs - 1);
+  if (blink) {
+    // eyes squeezed to short lines
+    ctx.strokeStyle = "#111111";
+    ctx.lineWidth = Math.max(1, s * 0.04);
+    for (const ex of [cx + s * 0.37, cx + s * 0.63]) {
+      ctx.beginPath();
+      ctx.moveTo(ex - s * 0.078, cy + s * 0.44);
+      ctx.lineTo(ex + s * 0.078, cy + s * 0.44);
+      ctx.stroke();
+    }
+  } else {
+    ctx.fillStyle = "#111111";
+    ctx.beginPath(); ctx.arc(cx + s * 0.37, cy + s * 0.44, s * 0.06, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + s * 0.63, cy + s * 0.44, s * 0.06, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = "#ff9ec4";
+  ctx.beginPath(); ctx.arc(cx + s * 0.5, cy + s * 0.62, s * 0.07, 0, 7); ctx.fill();
+  // whiskers sweeping out from the nose
+  ctx.strokeStyle = "#c9ced4";
+  ctx.lineWidth = Math.max(1, s * 0.02);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx + s * 0.46, cy + s * 0.62); ctx.lineTo(cx + s * 0.28, cy + s * 0.58);
+  ctx.moveTo(cx + s * 0.46, cy + s * 0.64); ctx.lineTo(cx + s * 0.29, cy + s * 0.66);
+  ctx.moveTo(cx + s * 0.54, cy + s * 0.62); ctx.lineTo(cx + s * 0.72, cy + s * 0.58);
+  ctx.moveTo(cx + s * 0.54, cy + s * 0.64); ctx.lineTo(cx + s * 0.71, cy + s * 0.66);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.strokeStyle = "#ff9ec4";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(bx + bs, cy + s * 0.7);
+  ctx.quadraticCurveTo(cx + s * 1.02, cy + s * (0.7 + tail), cx + s * (0.98 + tail), cy + s * 0.4);
+  ctx.stroke();
+}
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -119,12 +187,13 @@ export class Renderer {
     ctx.fillStyle = p.fog;
     ctx.fillRect(0, 0, VW * T, VH * T);
 
-    // floor + shelves (walls stay fog)
+    // floor + shelving racks + box crates (walls stay fog)
     for (let y = 0; y < r.h; y++) {
       for (let x = 0; x < r.w; x++) {
         const t = r.tiles[y * r.w + x];
         if (t === Tile.Floor) this.floorTile(px(x), py(y), p);
-        else if (t === Tile.Shelf) this.shelf(px(x), py(y), p);
+        else if (t === Tile.Shelf) { this.floorTile(px(x), py(y), p); this.shelf(px(x), py(y), p, x * 73856 + y * 19349); }
+        else if (t === Tile.Crate) { this.floorTile(px(x), py(y), p); this.crate(px(x), py(y), p, x * 73856 + y * 19349); }
       }
     }
 
@@ -281,12 +350,84 @@ export class Renderer {
     this.ctx.fillStyle = p.dot;
     this.ctx.fillRect(cx + T / 2 - 1, cy + T / 2 - 1, 2, 2);
   }
-  private shelf(cx: number, cy: number, p: Palette) {
-    this.ctx.fillStyle = p.shelf;
-    this.ctx.fillRect(cx + 2, cy + 2, T - 4, T - 4);
-    this.ctx.strokeStyle = "rgba(0,0,0,.25)";
-    this.ctx.lineWidth = 1;
-    this.ctx.strokeRect(cx + 2.5, cy + 2.5, T - 5, T - 5);
+  /**
+   * A shelving-rack cell, drawn at 50% opacity so long aisles read softly over
+   * the floor. Inset only 1px so a run of them reads as one long unit; split
+   * into two stocked shelves with little grey product boxes whose shades vary
+   * by `seed` (stable per tile, so they don't flicker).
+   */
+  private shelf(cx: number, cy: number, p: Palette, seed: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = p === DARK ? 0.25 : 0.5; // fainter on the dark premium floors
+
+    // rack body
+    ctx.fillStyle = p.shelf;
+    ctx.fillRect(cx + 1, cy + 1, T - 2, T - 2);
+    // top highlight rail + dark frame
+    ctx.fillStyle = "rgba(255,255,255,.08)";
+    ctx.fillRect(cx + 1, cy + 1, T - 2, 2);
+    ctx.strokeStyle = "rgba(0,0,0,.3)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx + 1.5, cy + 1.5, T - 3, T - 3);
+    // two ledges of goods
+    const inset = 3, midY = cy + T / 2;
+    for (let row = 0; row < 2; row++) {
+      const ledgeY = row === 0 ? midY - 1 : cy + T - 3; // where goods stand on
+      const topY = row === 0 ? cy + 4 : midY + 1;
+      const boxes = 3;
+      const bw = (T - 2 * inset) / boxes;
+      for (let i = 0; i < boxes; i++) {
+        const hsh = (seed ^ (row * 101 + i * 37) * 2654435761) >>> 0;
+        const col = PRODUCT_COLORS[hsh % PRODUCT_COLORS.length];
+        const bh = (ledgeY - topY) * (0.6 + ((hsh >> 8) % 40) / 100); // 0.6–1.0 tall
+        ctx.fillStyle = col;
+        ctx.fillRect(cx + inset + i * bw + 0.5, ledgeY - bh, bw - 1, bh);
+      }
+      // the ledge the goods sit on
+      ctx.fillStyle = "rgba(0,0,0,.4)";
+      ctx.fillRect(cx + 1, ledgeY, T - 2, 1);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * A cardboard box/pallet crate sitting on the floor — brown carton with a
+   * lighter lid, flap seam and a strip of packing tape. `seed` nudges the hue
+   * a touch so stacked crates aren't identical. Drawn a little transparent so it
+   * sits at the same soft visual weight as the shelving racks (fainter on dark
+   * floors), rather than popping out brighter than everything else.
+   */
+  private crate(cx: number, cy: number, p: Palette, seed: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = p === DARK ? 0.42 : 0.6;
+    const m = 2.5, s = T - 2 * m; // box footprint
+    const bx = cx + m, by = cy + m;
+    const tint = (seed >>> 0) % 3; // three cardboard shades
+    const body = ["#b07a43", "#a9743d", "#b8814a"][tint];
+    const lid = ["#c69356", "#bf8c50", "#cd9a5d"][tint];
+    // drop shadow
+    ctx.fillStyle = "rgba(0,0,0,.18)";
+    ctx.fillRect(bx + 1.5, by + 2, s, s);
+    // box body
+    ctx.fillStyle = body;
+    ctx.fillRect(bx, by, s, s);
+    // lighter lid band across the top
+    ctx.fillStyle = lid;
+    ctx.fillRect(bx, by, s, s * 0.32);
+    // frame + flap seam down the lid
+    ctx.strokeStyle = "#7a5126";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, by + 0.5, s - 1, s - 1);
+    ctx.beginPath();
+    ctx.moveTo(bx, by + s * 0.32); ctx.lineTo(bx + s, by + s * 0.32); // lid seam
+    ctx.moveTo(bx + s / 2, by); ctx.lineTo(bx + s / 2, by + s * 0.32); // flap split
+    ctx.stroke();
+    // packing-tape strip
+    ctx.fillStyle = "rgba(226,214,183,.75)";
+    ctx.fillRect(bx + s * 0.4, by, s * 0.2, s);
+    ctx.restore();
   }
 
   /**
@@ -381,39 +522,7 @@ export class Renderer {
   }
 
   private mouse(cx: number, cy: number, tail = 0, blink = false) {
-    const ctx = this.ctx;
-    const bx = cx + T * 0.15, by = cy + T * 0.15, bs = T * 0.7;
-    ctx.fillStyle = "#f5f6f8";
-    ctx.strokeStyle = "#5a5f66";
-    ctx.lineWidth = 1;
-    for (const ex of [bx + 3, bx + bs - 3]) {
-      ctx.beginPath();
-      ctx.moveTo(ex, by);
-      ctx.lineTo(ex - T * 0.11, by - T * 0.14);
-      ctx.lineTo(ex + T * 0.11, by - T * 0.12);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    }
-    ctx.fillStyle = "#f5f6f8";
-    ctx.fillRect(bx, by, bs, bs);
-    ctx.strokeRect(bx + 0.5, by + 0.5, bs - 1, bs - 1);
-    if (blink) {
-      this.eyeLine(cx + T * 0.37, cy + T * 0.44, T * 0.06, "#111111");
-      this.eyeLine(cx + T * 0.63, cy + T * 0.44, T * 0.06, "#111111");
-    } else {
-      ctx.fillStyle = "#111111";
-      ctx.beginPath(); ctx.arc(cx + T * 0.37, cy + T * 0.44, T * 0.06, 0, 7); ctx.fill();
-      ctx.beginPath(); ctx.arc(cx + T * 0.63, cy + T * 0.44, T * 0.06, 0, 7); ctx.fill();
-    }
-    ctx.fillStyle = "#ff9ec4";
-    ctx.beginPath(); ctx.arc(cx + T * 0.5, cy + T * 0.62, T * 0.07, 0, 7); ctx.fill();
-    ctx.strokeStyle = "#ff9ec4";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(bx + bs, cy + T * 0.7);
-    ctx.quadraticCurveTo(cx + T * 1.02, cy + T * (0.7 + tail), cx + T * (0.98 + tail), cy + T * 0.4);
-    ctx.stroke();
+    drawMouse(this.ctx, cx, cy, T, tail, blink);
   }
 
   // --- enemies ---
@@ -446,19 +555,47 @@ export class Renderer {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(cx + T * 0.33, ey + h * 0.62, T * 0.34, T * 0.14);
     } else if (kind === "loader") {
+      // cardboard box on the head with packing tape
+      const boxX = cx + T * 0.4, boxY = ey - T * 0.14, boxW = T * 0.2, boxH = T * 0.16;
       ctx.fillStyle = "#7a4a24";
-      ctx.fillRect(cx + T * 0.4, ey - T * 0.14, T * 0.2, T * 0.16);
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+      ctx.strokeStyle = "#5c3415"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(boxX + boxW / 2, boxY); ctx.lineTo(boxX + boxW / 2, boxY + boxH);
+      ctx.moveTo(boxX, boxY + boxH / 2); ctx.lineTo(boxX + boxW, boxY + boxH / 2);
+      ctx.stroke();
     } else if (kind === "guard") {
-      ctx.fillStyle = "#d9dde1";
-      ctx.beginPath(); ctx.arc(ex + w, cy + T * 0.5, T * 0.05, 0, 7); ctx.fill();
+      // Police badge: a gold five-point star pinned to one side of the chest
+      const bcx = cx + T * 0.37, bcy = ey + h * 0.5, br = T * 0.095;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+        const rr = i % 2 === 0 ? br : br * 0.45;
+        const px2 = bcx + Math.cos(ang) * rr, py2 = bcy + Math.sin(ang) * rr;
+        if (i === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+      }
+      ctx.closePath();
+      ctx.fillStyle = "#f2c94c"; ctx.fill();
+      ctx.strokeStyle = "#a9801f"; ctx.lineWidth = Math.max(1, T * 0.02); ctx.stroke();
+      ctx.fillStyle = "#fff0b8"; // center stud
+      ctx.beginPath(); ctx.arc(bcx, bcy, br * 0.22, 0, 7); ctx.fill();
     } else {
       ctx.strokeStyle = "#9aa0a6"; // boss mop — swings by rotating about its top end
       ctx.lineWidth = 2;
       const mx = T * 0.12, my = h - 2;
+      const endX = ex + w + mx * Math.cos(mop) - my * Math.sin(mop);
+      const endY = ey + 2 + mx * Math.sin(mop) + my * Math.cos(mop);
       ctx.beginPath();
       ctx.moveTo(ex + w, ey + 2);
-      ctx.lineTo(ex + w + mx * Math.cos(mop) - my * Math.sin(mop), ey + 2 + mx * Math.sin(mop) + my * Math.cos(mop));
+      ctx.lineTo(endX, endY);
       ctx.stroke();
+      // frayed mop head at the far end
+      ctx.fillStyle = "#cfd3d7";
+      ctx.beginPath(); ctx.ellipse(endX, endY, T * 0.1, T * 0.06, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = "#b8bcc0"; ctx.lineWidth = 1; ctx.lineCap = "round";
+      ctx.beginPath();
+      for (const o of [-0.07, -0.025, 0.025, 0.07]) { ctx.moveTo(endX + o * T, endY); ctx.lineTo(endX + o * T, endY + T * 0.12); }
+      ctx.stroke(); ctx.lineCap = "butt";
     }
   }
 
@@ -493,59 +630,152 @@ export class Renderer {
     const ctx = this.ctx;
     const X = cx + T / 2, Y = cy + T / 2;
     switch (kind) {
-      case "cheese":
+      case "cheese": {
+        // Wedge of Swiss: golden body, baked rind along the crust, shaded holes
+        const ax = cx + T * 0.26, ay = cy + T * 0.66; // bottom-left
+        const bx = cx + T * 0.74, by = cy + T * 0.66; // bottom-right
+        const tx = cx + T * 0.5, ty = cy + T * 0.3;   // top point
         ctx.fillStyle = "#f2c84b";
-        ctx.beginPath(); ctx.moveTo(cx + T * 0.28, cy + T * 0.66); ctx.lineTo(cx + T * 0.72, cy + T * 0.66); ctx.lineTo(cx + T * 0.5, cy + T * 0.3); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = "#d9a92a";
-        ctx.beginPath(); ctx.arc(X - 2, Y + 3, 1.8, 0, 7); ctx.fill();
-        ctx.beginPath(); ctx.arc(X + 3, Y + 1, 1.5, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(tx, ty); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = "#c8991f"; ctx.lineWidth = Math.max(1, T * 0.028); ctx.stroke();
+        // darker rind along the bottom crust
+        ctx.strokeStyle = "#e0a92a"; ctx.lineWidth = Math.max(1.5, T * 0.055); ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+        // bright top edge highlight
+        ctx.strokeStyle = "#ffe9a6"; ctx.lineWidth = Math.max(1, T * 0.03);
+        ctx.beginPath(); ctx.moveTo(ax + T * 0.02, ay - T * 0.03); ctx.lineTo(tx, ty + T * 0.02); ctx.stroke();
+        ctx.lineCap = "butt";
+        // holes with inner shadow
+        for (const [hx, hy, r] of [[0.46, 0.55, 0.05], [0.58, 0.49, 0.034], [0.5, 0.44, 0.026]]) {
+          ctx.fillStyle = "#d9a92a";
+          ctx.beginPath(); ctx.arc(cx + hx * T, cy + hy * T, T * r, 0, 7); ctx.fill();
+          ctx.fillStyle = "#c08d1e";
+          ctx.beginPath(); ctx.arc(cx + hx * T + T * 0.008, cy + hy * T + T * 0.008, T * r * 0.55, 0, 7); ctx.fill();
+        }
         break;
+      }
       case "croissant": {
-        // filled crescent: fat in the middle, tapering to pointed horns
-        const lx = cx + 0.27 * T, rx = cx + 0.73 * T, hy = cy + 0.4 * T;
-        ctx.beginPath();
-        ctx.moveTo(lx, hy);
-        ctx.quadraticCurveTo(cx + 0.5 * T, cy + 0.82 * T, rx, hy); // outer belly
-        ctx.quadraticCurveTo(cx + 0.5 * T, cy + 0.52 * T, lx, hy); // inner curve
-        ctx.closePath();
+        // Flaky crescent: rolled segments along a curved spine (horns up, fat belly),
+        // drawn as overlapping humps with a sticker-outline, baked shading & glaze.
+        const bumps: [number, number, number][] = [
+          [X - T * 0.27, Y - T * 0.01, T * 0.062], // left horn (tapered)
+          [X - T * 0.14, Y + T * 0.07, T * 0.115],
+          [X,            Y + T * 0.11, T * 0.13],   // center belly
+          [X + T * 0.14, Y + T * 0.07, T * 0.115],
+          [X + T * 0.27, Y - T * 0.01, T * 0.062], // right horn (tapered)
+        ];
+        // dark sticker-outline underneath gives the blob a clean silhouette
+        ctx.fillStyle = "#a9761f";
+        for (const [mx, my, r] of bumps) { ctx.beginPath(); ctx.arc(mx, my, r + Math.max(1, T * 0.03), 0, 7); ctx.fill(); }
+        // golden body
         ctx.fillStyle = "#e3a94a";
-        ctx.fill();
-        ctx.strokeStyle = "#b5832f";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        // segment ridges
+        for (const [mx, my, r] of bumps) { ctx.beginPath(); ctx.arc(mx, my, r, 0, 7); ctx.fill(); }
+        // soft baked shadow along each segment's underside
+        ctx.strokeStyle = "#cf9036"; ctx.lineWidth = Math.max(1.5, T * 0.05); ctx.lineCap = "round";
+        for (const [mx, my, r] of bumps) { ctx.beginPath(); ctx.arc(mx, my, r * 0.72, Math.PI * 0.18, Math.PI * 0.82); ctx.stroke(); }
+        // glossy highlights on the upper side of each roll
+        ctx.fillStyle = "#f6cd82";
+        for (const [mx, my, r] of bumps) { ctx.beginPath(); ctx.arc(mx - r * 0.18, my - r * 0.34, r * 0.42, 0, 7); ctx.fill(); }
+        // seams where the rolled segments meet
+        ctx.strokeStyle = "#b5832f"; ctx.lineWidth = Math.max(1, T * 0.022);
         ctx.beginPath();
-        for (const sx of [0.43, 0.5, 0.57]) {
-          ctx.moveTo(cx + sx * T, cy + 0.51 * T);
-          ctx.lineTo(cx + sx * T, cy + 0.6 * T);
+        for (let i = 0; i < bumps.length - 1; i++) {
+          const mxp = (bumps[i][0] + bumps[i + 1][0]) / 2, myp = (bumps[i][1] + bumps[i + 1][1]) / 2;
+          ctx.moveTo(mxp, myp - T * 0.05); ctx.lineTo(mxp, myp + T * 0.055);
         }
         ctx.stroke();
+        ctx.lineCap = "butt";
         break;
       }
       case "cookie":
-        ctx.fillStyle = "#b07a3f"; ctx.beginPath(); ctx.arc(X, Y, T * 0.18, 0, 7); ctx.fill();
-        ctx.fillStyle = "#5a3a1a";
-        for (const d of [[-3, -2], [3, -1], [-1, 3]]) { ctx.beginPath(); ctx.arc(X + d[0], Y + d[1], 1.4, 0, 7); ctx.fill(); }
-        break;
-      case "bread":
-        ctx.fillStyle = "#c9975b"; ctx.beginPath(); ctx.roundRect(cx + T * 0.28, cy + T * 0.36, T * 0.44, T * 0.3, T * 0.12); ctx.fill();
-        break;
-      case "sausage":
-        ctx.fillStyle = "#e38a9a"; // pink sausage
-        ctx.beginPath(); ctx.roundRect(cx + T * 0.26, cy + T * 0.42, T * 0.48, T * 0.18, T * 0.09); ctx.fill();
-        ctx.fillStyle = "#f5eef0"; // white fat specks
-        for (const d of [[0.37, 0.5], [0.5, 0.52], [0.63, 0.49]]) {
-          ctx.beginPath(); ctx.arc(cx + d[0] * T, cy + d[1] * T, T * 0.025, 0, Math.PI * 2); ctx.fill();
+        // Chocolate-chip cookie: baked dough disc, darker rim, shaded chips
+        ctx.fillStyle = "#c08a4a"; ctx.beginPath(); ctx.arc(X, Y, T * 0.19, 0, 7); ctx.fill();
+        ctx.strokeStyle = "#9c6a33"; ctx.lineWidth = Math.max(1, T * 0.025);
+        ctx.beginPath(); ctx.arc(X, Y, T * 0.19, 0, 7); ctx.stroke();
+        for (const [dx, dy, r] of [[-0.07, -0.04, 0.03], [0.05, -0.06, 0.025], [0.08, 0.04, 0.03], [-0.03, 0.08, 0.026], [-0.09, 0.04, 0.02], [0.0, -0.01, 0.022]]) {
+          ctx.fillStyle = "#4a2d17";
+          ctx.beginPath(); ctx.arc(X + dx * T, Y + dy * T, T * r, 0, 7); ctx.fill();
+          ctx.fillStyle = "#6b4426"; // tiny glint on each chip
+          ctx.beginPath(); ctx.arc(X + dx * T - T * 0.008, Y + dy * T - T * 0.008, T * r * 0.4, 0, 7); ctx.fill();
         }
         break;
-      case "cake":
-        ctx.fillStyle = "#f3d9b8"; ctx.beginPath(); ctx.moveTo(cx + T * 0.3, cy + T * 0.68); ctx.lineTo(cx + T * 0.7, cy + T * 0.68); ctx.lineTo(cx + T * 0.5, cy + T * 0.34); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = "#e2231a"; ctx.beginPath(); ctx.arc(cx + T * 0.5, cy + T * 0.4, 2.2, 0, 7); ctx.fill();
+      case "bread": {
+        // Crusty loaf: domed top, golden crust outline, diagonal score slashes
+        const lx = cx + T * 0.24, ly = cy + T * 0.4, lw = T * 0.52, lh = T * 0.26;
+        ctx.fillStyle = "#c9975b";
+        ctx.beginPath(); ctx.roundRect(lx, ly, lw, lh, [T * 0.15, T * 0.15, T * 0.08, T * 0.08]); ctx.fill();
+        ctx.strokeStyle = "#9c6f3a"; ctx.lineWidth = Math.max(1, T * 0.03); ctx.stroke();
+        // soft top highlight
+        ctx.strokeStyle = "#e4bd84"; ctx.lineWidth = Math.max(1, T * 0.035); ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(lx + T * 0.06, ly + T * 0.06); ctx.quadraticCurveTo(X, ly - T * 0.01, lx + lw - T * 0.06, ly + T * 0.06); ctx.stroke();
+        // score slashes
+        ctx.strokeStyle = "#8a5f30"; ctx.lineWidth = Math.max(1, T * 0.028);
+        ctx.beginPath();
+        for (const sx of [0.41, 0.52, 0.63]) { ctx.moveTo(cx + sx * T, ly + T * 0.07); ctx.lineTo(cx + (sx - 0.05) * T, ly + lh - T * 0.06); }
+        ctx.stroke();
+        ctx.lineCap = "butt";
         break;
-      case "sushi":
-        ctx.fillStyle = "#f5f5f0"; ctx.beginPath(); ctx.roundRect(cx + T * 0.28, cy + T * 0.44, T * 0.44, T * 0.22, T * 0.1); ctx.fill();
-        ctx.fillStyle = "#ff8c66"; ctx.beginPath(); ctx.roundRect(cx + T * 0.28, cy + T * 0.4, T * 0.44, T * 0.1, [T * 0.1, T * 0.1, 0, 0]); ctx.fill();
+      }
+      case "sausage": {
+        // Plump link: glossy pink body, pinched ends, marbled fat specks
+        const sx = cx + T * 0.24, sy = cy + T * 0.42, sw = T * 0.52, sh = T * 0.2;
+        ctx.fillStyle = "#d9798a";
+        ctx.beginPath(); ctx.roundRect(sx, sy, sw, sh, sh / 2); ctx.fill();
+        ctx.strokeStyle = "#b45a6b"; ctx.lineWidth = Math.max(1, T * 0.025); ctx.stroke();
+        // top gloss highlight
+        ctx.strokeStyle = "#f0b8c3"; ctx.lineWidth = Math.max(1, T * 0.035); ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(sx + T * 0.07, sy + T * 0.05); ctx.lineTo(sx + sw - T * 0.07, sy + T * 0.05); ctx.stroke();
+        // pinched ends
+        ctx.strokeStyle = "#b45a6b"; ctx.lineWidth = Math.max(1, T * 0.03);
+        ctx.beginPath();
+        ctx.moveTo(sx + T * 0.03, sy + T * 0.03); ctx.lineTo(sx + T * 0.03, sy + sh - T * 0.03);
+        ctx.moveTo(sx + sw - T * 0.03, sy + T * 0.03); ctx.lineTo(sx + sw - T * 0.03, sy + sh - T * 0.03);
+        ctx.stroke();
+        ctx.lineCap = "butt";
+        ctx.fillStyle = "#f5eef0"; // white fat specks
+        for (const d of [[0.37, 0.5], [0.5, 0.53], [0.63, 0.49]]) {
+          ctx.beginPath(); ctx.arc(cx + d[0] * T, cy + d[1] * T, T * 0.022, 0, Math.PI * 2); ctx.fill();
+        }
         break;
+      }
+      case "cake": {
+        // Layered slice (side view): sponge wedge, cream stripe, pink frosting crown, cherry
+        ctx.beginPath();
+        ctx.moveTo(cx + 0.3 * T, cy + 0.34 * T); // back-top
+        ctx.lineTo(cx + 0.3 * T, cy + 0.7 * T);  // back-bottom
+        ctx.lineTo(cx + 0.74 * T, cy + 0.6 * T); // front tip
+        ctx.closePath();
+        ctx.fillStyle = "#f3d9b8"; ctx.fill();
+        ctx.strokeStyle = "#d8b483"; ctx.lineWidth = Math.max(1, T * 0.025); ctx.stroke();
+        // cream filling stripe
+        ctx.strokeStyle = "#fff4e8"; ctx.lineWidth = Math.max(1.5, T * 0.045); ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(cx + 0.31 * T, cy + 0.52 * T); ctx.lineTo(cx + 0.7 * T, cy + 0.56 * T); ctx.stroke();
+        // frosting along the top slope
+        ctx.strokeStyle = "#f6a5c0"; ctx.lineWidth = Math.max(1.5, T * 0.05);
+        ctx.beginPath(); ctx.moveTo(cx + 0.3 * T, cy + 0.34 * T); ctx.lineTo(cx + 0.74 * T, cy + 0.6 * T); ctx.stroke();
+        ctx.lineCap = "butt";
+        // cherry on top
+        ctx.fillStyle = "#e2231a"; ctx.beginPath(); ctx.arc(cx + 0.36 * T, cy + 0.33 * T, T * 0.05, 0, 7); ctx.fill();
+        ctx.fillStyle = "#ff6a5e"; ctx.beginPath(); ctx.arc(cx + 0.345 * T, cy + 0.315 * T, T * 0.017, 0, 7); ctx.fill();
+        break;
+      }
+      case "sushi": {
+        // Nigiri: rice bed, salmon fillet with marbling, nori band around the middle
+        const rx = cx + 0.26 * T, ry = cy + 0.46 * T, rw = T * 0.48, rh = T * 0.2;
+        ctx.fillStyle = "#f5f5f0"; ctx.beginPath(); ctx.roundRect(rx, ry, rw, rh, T * 0.1); ctx.fill();
+        ctx.strokeStyle = "#dcdcd2"; ctx.lineWidth = 1; ctx.stroke();
+        // salmon slice draped on top
+        ctx.fillStyle = "#ff8c66"; ctx.beginPath(); ctx.roundRect(rx, cy + 0.39 * T, rw, T * 0.13, [T * 0.1, T * 0.1, T * 0.02, T * 0.02]); ctx.fill();
+        // salmon marbling
+        ctx.strokeStyle = "#ffd0bd"; ctx.lineWidth = Math.max(1, T * 0.025); ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(rx + T * 0.07, cy + 0.45 * T); ctx.lineTo(rx + T * 0.17, cy + 0.43 * T);
+        ctx.moveTo(rx + T * 0.24, cy + 0.46 * T); ctx.lineTo(rx + T * 0.35, cy + 0.44 * T);
+        ctx.stroke(); ctx.lineCap = "butt";
+        // nori wrap
+        ctx.fillStyle = "#2f4a3a"; ctx.fillRect(X - T * 0.05, cy + 0.39 * T, T * 0.1, T * 0.27);
+        break;
+      }
       case "shrimp": {
         // Cooked prawn: hooked pink-coral body, segmented shell bands, fan tail & antennae
         const tailX = X + T * 0.09, tailY = Y + T * 0.17;
@@ -622,15 +852,41 @@ export class Renderer {
         ctx.fill();
         break;
       }
-      case "steak":
-        ctx.fillStyle = "#6e3b2a"; ctx.beginPath(); ctx.roundRect(cx + T * 0.26, cy + T * 0.35, T * 0.48, T * 0.32, T * 0.1); ctx.fill();
-        ctx.fillStyle = "#d98a7a"; ctx.beginPath(); ctx.ellipse(X, Y + 1, T * 0.14, T * 0.09, 0, 0, 7); ctx.fill();
+      case "steak": {
+        // Grilled cut: seared body, pale fat rim, rosy centre, grill marks & bone nub
+        const stx = cx + 0.24 * T, sty = cy + 0.35 * T, stw = T * 0.5, sth = T * 0.32;
+        ctx.fillStyle = "#8a4a33";
+        ctx.beginPath(); ctx.roundRect(stx, sty, stw, sth, T * 0.13); ctx.fill();
+        ctx.strokeStyle = "#e3c39f"; ctx.lineWidth = Math.max(1.5, T * 0.045); ctx.stroke(); // fat rim
+        // rosy inner doneness
+        ctx.fillStyle = "#b35b45"; ctx.beginPath(); ctx.ellipse(X + T * 0.02, Y, T * 0.15, T * 0.09, 0, 0, 7); ctx.fill();
+        // diagonal grill marks
+        ctx.strokeStyle = "#4e2a1d"; ctx.lineWidth = Math.max(1, T * 0.026); ctx.lineCap = "round";
+        ctx.beginPath();
+        for (const o of [-0.1, 0, 0.1]) { ctx.moveTo(X + o * T - T * 0.05, sty + T * 0.06); ctx.lineTo(X + o * T + T * 0.05, sty + sth - T * 0.06); }
+        ctx.stroke(); ctx.lineCap = "butt";
+        // bone nub
+        ctx.fillStyle = "#f3ead8"; ctx.beginPath(); ctx.arc(stx + T * 0.03, Y, T * 0.045, 0, 7); ctx.fill();
         break;
-      case "chocolate":
-        ctx.fillStyle = "#5a3a24"; ctx.fillRect(cx + T * 0.3, cy + T * 0.33, T * 0.4, T * 0.4);
-        ctx.strokeStyle = "#7a4a2e"; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(X, cy + T * 0.33); ctx.lineTo(X, cy + T * 0.73); ctx.moveTo(cx + T * 0.3, Y); ctx.lineTo(cx + T * 0.7, Y); ctx.stroke();
+      }
+      case "chocolate": {
+        // Chocolate bar: dark slab with a 3×2 grid of embossed, glossy squares
+        const bx = cx + 0.28 * T, by = cy + 0.32 * T, bw = T * 0.44, bh = T * 0.4;
+        ctx.fillStyle = "#3a2416"; // base/shadow slab shows between squares
+        ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, T * 0.03); ctx.fill();
+        const cols = 3, rows = 2, gap = T * 0.022;
+        const cw = (bw - gap * (cols + 1)) / cols, ch = (bh - gap * (rows + 1)) / rows;
+        for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+          const qx = bx + gap + i * (cw + gap), qy = by + gap + j * (ch + gap);
+          ctx.fillStyle = "#5a3a24"; ctx.beginPath(); ctx.roundRect(qx, qy, cw, ch, T * 0.02); ctx.fill();
+          // top-left bevel highlight
+          ctx.fillStyle = "#71492d";
+          ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(qx + cw, qy); ctx.lineTo(qx, qy + ch); ctx.closePath(); ctx.fill();
+          // inner square face
+          ctx.fillStyle = "#5a3a24"; ctx.beginPath(); ctx.roundRect(qx + cw * 0.18, qy + ch * 0.18, cw * 0.72, ch * 0.72, T * 0.015); ctx.fill();
+        }
         break;
+      }
     }
   }
 

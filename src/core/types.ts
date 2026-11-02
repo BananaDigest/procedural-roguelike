@@ -10,11 +10,16 @@
 
 export type Vec2 = { x: number; y: number };
 
-/** The three kinds of cell. Shelf is a free-standing in-room obstacle. */
+/**
+ * Kinds of cell. Shelf and Crate are free-standing in-room obstacles — both
+ * block movement exactly like a wall (see isWalkable); they differ only in how
+ * they look: Shelf is a shelving rack (long aisle runs), Crate is a box/pallet.
+ */
 export enum Tile {
   Floor = 0,
   Wall = 1,
   Shelf = 2,
+  Crate = 3,
 }
 
 export type EnemyKind = "cashier" | "loader" | "guard" | "boss";

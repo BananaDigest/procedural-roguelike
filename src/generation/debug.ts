@@ -1,7 +1,7 @@
 /**
  * ASCII dump of generated rooms — for checking the generator in the console.
  *
- *   #  wall      =  shelf     .  floor     @  entry
+ *   #  wall      =  shelf     x  crate    .  floor     @  entry
  *   O  нора fwd  o  нора back  L  люк fwd  l  люк back
  *   c  cashier   g  loader (вантажник)     G  guard   B  boss
  *   *  food      ^  trap      t  toothpick  e  energy drink
@@ -17,7 +17,7 @@ export function roomToAscii(room: Room): string {
     const row: string[] = [];
     for (let x = 0; x < room.w; x++) {
       const t = room.tiles[y * room.w + x];
-      row.push(t === Tile.Wall ? "#" : t === Tile.Shelf ? "=" : ".");
+      row.push(t === Tile.Wall ? "#" : t === Tile.Shelf ? "=" : t === Tile.Crate ? "x" : ".");
     }
     grid.push(row);
   }
