@@ -86,10 +86,10 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
     }
   }
 
-  // 2. shelving aisles + a few box crates (none in the arena — the boss needs space)
+  // 2. shelving (WFC) + box crates (Poisson-disk) — none in the arena, the boss needs space
   if (!arena && withShelves) {
-    placeAisles(tiles, w, h, rng);
-    placeCrates(tiles, w, h, rng.int(1, 3), rng);
+    placeShelvesWFC(tiles, w, h, rng);
+    placeCratesPoisson(tiles, w, h, rng);
   }
 
   const room: Room = {
@@ -269,71 +269,202 @@ function takeFar(
   return take((p) => minDist(p) >= span / 2) ?? take((p) => minDist(p) >= 3) ?? take(() => true);
 }
 
+// ─── Shelving: Wave Function Collapse (simple tiled model) ───────────────
+//
+// Tile alphabet. Each tile's four edges [N,E,S,W] carry a socket: 'f' faces
+// open floor, 'h' links a horizontal run left↔right, 'v' links a vertical run
+// top↔bottom. Two tiles may sit edge-to-edge only if the touching sockets are
+// equal; plus two same-orientation shelves may never meet back-to-back, so
+// runs stay exactly one tile thick (no blobs) and, lacking corner tiles, can
+// never close a loop. With a forced floor ring inside the wall frame you can
+// always walk around a run's ends → the floor stays one connected region.
+interface WfcTile { shelf: boolean; o: "F" | "H" | "V"; N: string; E: string; S: string; W: string }
+const WFC_TILES: WfcTile[] = [
+  { shelf: false, o: "F", N: "f", E: "f", S: "f", W: "f" }, // 0 floor / walkway
+  { shelf: true, o: "H", N: "f", E: "h", S: "f", W: "f" }, // 1 horizontal run — left end
+  { shelf: true, o: "H", N: "f", E: "h", S: "f", W: "h" }, // 2 horizontal run — middle
+  { shelf: true, o: "H", N: "f", E: "f", S: "f", W: "h" }, // 3 horizontal run — right end
+  { shelf: true, o: "V", N: "f", E: "f", S: "v", W: "f" }, // 4 vertical run — top end
+  { shelf: true, o: "V", N: "v", E: "f", S: "v", W: "f" }, // 5 vertical run — middle
+  { shelf: true, o: "V", N: "v", E: "f", S: "f", W: "f" }, // 6 vertical run — bottom end
+];
+// Floor common; middles weighted up so a started run tends to extend.
+const WFC_WEIGHT = [13, 1, 3, 1, 1, 3, 1];
+const WFC_DIRS = [
+  { dx: 0, dy: -1, edge: "N", opp: "S" },
+  { dx: 1, dy: 0, edge: "E", opp: "W" },
+  { dx: 0, dy: 1, edge: "S", opp: "N" },
+  { dx: -1, dy: 0, edge: "W", opp: "E" },
+] as const;
+
+/** May tile `b` sit in direction `d` from tile `a`? */
+function wfcCompatible(a: number, b: number, d: number): boolean {
+  const ta = WFC_TILES[a], tb = WFC_TILES[b], dir = WFC_DIRS[d];
+  const ea = ta[dir.edge as "N" | "E" | "S" | "W"], eb = tb[dir.opp as "N" | "E" | "S" | "W"];
+  if (ea !== eb) return false;
+  if (ea === "f") {
+    const vert = dir.edge === "N" || dir.edge === "S";
+    if (ta.o === "H" && tb.o === "H" && vert) return false; // no stacking horizontal runs
+    if (ta.o === "V" && tb.o === "V" && !vert) return false; // no side-by-side vertical runs
+  }
+  return true;
+}
+
+const wfcBitIndex = (bit: number) => 31 - Math.clz32(bit);
+function wfcBits(mask: number): number {
+  let c = 0;
+  while (mask) { mask &= mask - 1; c++; }
+  return c;
+}
+
 /**
- * Supermarket shelving aisles: parallel single-tile runs along the room's
- * longer axis, spaced by a 1–2 tile walkway. Each run leaves a floor corridor
- * down both ends of the cross axis (cross = 1 and cross = C-2 stay floor), so
- * every walkway is linked top-and-bottom and the floor is always one connected
- * region — no reliance on the re-roll safety net. Each run also gets a gap or
- * two so shoppers (and the greedy chasers) can cut across instead of snagging
- * on a long wall. Small rooms fall back to a couple of short free shelves.
+ * Collapse the interior into shelving runs with WFC. Falls back to a couple of
+ * short free shelves on tiny rooms or if every attempt hits a contradiction.
  */
-function placeAisles(tiles: Tile[], w: number, h: number, rng: Mulberry32): void {
-  const vertical = w >= h; // wide room → vertical aisle columns
-  const L = vertical ? w : h; // long axis: aisles repeat along it
-  const C = vertical ? h : w; // cross axis: each aisle runs along it
-  if (L < 9 || C < 6) {
-    placeFreeShelves(tiles, w, h, rng.int(1, 3), rng);
+function placeShelvesWFC(tiles: Tile[], w: number, h: number, rng: Mulberry32): void {
+  const iw = w - 2, ih = h - 2; // interior grid (inside the wall frame)
+  if (iw < 3 || ih < 3) { placeFreeShelves(tiles, w, h, rng.int(1, 3), rng); return; }
+
+  const N = WFC_TILES.length, FULL = (1 << N) - 1, FLOOR = 1;
+  // allowed[d][a] = bitmask of tiles permitted in direction d from tile a
+  const allowed: number[][] = [[], [], [], []];
+  for (let d = 0; d < 4; d++) {
+    for (let a = 0; a < N; a++) {
+      let m = 0;
+      for (let b = 0; b < N; b++) if (wfcCompatible(a, b, d)) m |= 1 << b;
+      allowed[d][a] = m;
+    }
+  }
+
+  const propagate = (dom: number[], seed: number[]): boolean => {
+    const q = seed.slice();
+    while (q.length) {
+      const c = q.pop()!;
+      const cx = c % iw, cy = (c / iw) | 0;
+      let acc = dom[c];
+      const perDir = [0, 0, 0, 0];
+      while (acc) { const bit = acc & -acc; const a = wfcBitIndex(bit); for (let d = 0; d < 4; d++) perDir[d] |= allowed[d][a]; acc ^= bit; }
+      for (let d = 0; d < 4; d++) {
+        const nx = cx + WFC_DIRS[d].dx, ny = cy + WFC_DIRS[d].dy;
+        if (nx < 0 || ny < 0 || nx >= iw || ny >= ih) continue;
+        const ni = ny * iw + nx, nd = dom[ni] & perDir[d];
+        if (nd === 0) return false;
+        if (nd !== dom[ni]) { dom[ni] = nd; q.push(ni); }
+      }
+    }
+    return true;
+  };
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const dom = new Array<number>(iw * ih).fill(FULL);
+    const ring: number[] = [];
+    for (let y = 0; y < ih; y++) {
+      for (let x = 0; x < iw; x++) {
+        if (x === 0 || y === 0 || x === iw - 1 || y === ih - 1) { dom[y * iw + x] = FLOOR; ring.push(y * iw + x); }
+      }
+    }
+    if (!propagate(dom, ring)) continue;
+
+    let ok = true;
+    for (;;) {
+      // observe: the undecided cell with the fewest options (ties broken by rng)
+      let bestN = 99; const cands: number[] = [];
+      for (let i = 0; i < dom.length; i++) {
+        const n = wfcBits(dom[i]);
+        if (n > 1) { if (n < bestN) { bestN = n; cands.length = 0; cands.push(i); } else if (n === bestN) cands.push(i); }
+      }
+      if (cands.length === 0) break; // fully collapsed
+      const cell = cands.length === 1 ? cands[0] : rng.pick(cands);
+      // collapse by weighted choice among the cell's remaining tiles
+      const items: { value: number; weight: number }[] = [];
+      for (let b = 0; b < N; b++) if (dom[cell] & (1 << b)) items.push({ value: b, weight: WFC_WEIGHT[b] });
+      dom[cell] = 1 << rng.weighted(items);
+      if (!propagate(dom, [cell])) { ok = false; break; }
+    }
+    if (!ok) continue;
+
+    for (let y = 0; y < ih; y++) {
+      for (let x = 0; x < iw; x++) {
+        if (WFC_TILES[wfcBitIndex(dom[y * iw + x])].shelf) tiles[(y + 1) * w + (x + 1)] = Tile.Shelf;
+      }
+    }
     return;
   }
-  const set = (along: number, cross: number) => {
-    const x = vertical ? along : cross;
-    const y = vertical ? cross : along;
-    tiles[y * w + x] = Tile.Shelf;
-  };
-  const step = rng.chance(0.5) ? 2 : 3; // walkway width 1 or 2
-  const cTop = 2, cBot = C - 3; // cross = 1 and C-2 kept as access corridors
-  const runLen = cBot - cTop + 1;
-  for (let a = 3; a <= L - 4; a += step) {
-    const gaps = new Set<number>();
-    if (runLen >= 4) {
-      const gapCount = runLen >= 8 ? 2 : 1;
-      for (let g = 0; g < gapCount; g++) gaps.add(cTop + 1 + rng.int(0, runLen - 3));
-    }
-    for (let c = cTop; c <= cBot; c++) if (!gaps.has(c)) set(a, c);
-  }
+  placeFreeShelves(tiles, w, h, rng.int(1, 3), rng);
 }
 
+// ─── Crates: Bridson Poisson-disk sampling ───────────────────────────────
+
 /**
- * `n` box crates dropped in the open floor: a single box, a 1×2 / 2×1 pair, or
- * a 2×2 stack. Each keeps one tile of floor all around (never touching a wall,
- * a shelf, or another crate), so it can't seal off a region.
+ * Scatter box crates on open floor with Bridson's algorithm: sampled points
+ * keep a minimum centre distance `r`, so crates spread evenly without clumping.
+ * A handful of points become crates (1×1, a pair, or a 2×2 stack) wherever the
+ * 1-tile-dilated footprint is clear of walls, shelves and other crates.
  */
-function placeCrates(tiles: Tile[], w: number, h: number, n: number, rng: Mulberry32): void {
-  const shapes: [number, number][] = [[1, 1], [2, 1], [1, 2], [2, 2]];
-  for (let s = 0; s < n; s++) {
-    for (let tries = 0; tries < 30; tries++) {
-      const [cw, ch] = shapes[rng.int(0, shapes.length - 1)];
-      if (w - 4 < cw || h - 4 < ch) continue;
-      const x0 = rng.int(2, w - 3 - cw + 1);
-      const y0 = rng.int(2, h - 3 - ch + 1);
-      // reject if the 1-tile-dilated footprint touches any obstacle
-      let free = true;
-      for (let y = y0 - 1; y <= y0 + ch && free; y++) {
-        for (let x = x0 - 1; x <= x0 + cw; x++) {
-          if (tiles[y * w + x] !== Tile.Floor) { free = false; break; }
+function placeCratesPoisson(tiles: Tile[], w: number, h: number, rng: Mulberry32): void {
+  const minX = 2, minY = 2, maxX = w - 2, maxY = h - 2; // continuous domain, tile units
+  const dw = maxX - minX, dh = maxY - minY;
+  if (dw <= 1 || dh <= 1) return;
+  const r = 3, cell = r / Math.SQRT2;
+  const gw = Math.ceil(dw / cell), gh = Math.ceil(dh / cell);
+  const grid = new Int32Array(gw * gh).fill(-1);
+  const pts: { x: number; y: number }[] = [];
+  const active: number[] = [];
+  const add = (x: number, y: number) => {
+    const i = pts.length;
+    pts.push({ x, y });
+    active.push(i);
+    grid[(((y - minY) / cell) | 0) * gw + (((x - minX) / cell) | 0)] = i;
+  };
+  add(minX + rng.next() * dw, minY + rng.next() * dh);
+  const K = 30;
+  while (active.length) {
+    const ai = rng.int(0, active.length - 1);
+    const p = pts[active[ai]];
+    let placed = false;
+    for (let k = 0; k < K; k++) {
+      const ang = rng.next() * Math.PI * 2, rad = r * (1 + rng.next()); // [r, 2r)
+      const nx = p.x + Math.cos(ang) * rad, ny = p.y + Math.sin(ang) * rad;
+      if (nx < minX || ny < minY || nx >= maxX || ny >= maxY) continue;
+      const gx = ((nx - minX) / cell) | 0, gy = ((ny - minY) / cell) | 0;
+      let far = true;
+      for (let yy = Math.max(0, gy - 2); yy <= Math.min(gh - 1, gy + 2) && far; yy++) {
+        for (let xx = Math.max(0, gx - 2); xx <= Math.min(gw - 1, gx + 2); xx++) {
+          const qi = grid[yy * gw + xx];
+          if (qi >= 0) { const q = pts[qi]; if ((q.x - nx) ** 2 + (q.y - ny) ** 2 < r * r) { far = false; break; } }
         }
       }
-      if (!free) continue;
-      for (let y = y0; y < y0 + ch; y++) for (let x = x0; x < x0 + cw; x++) tiles[y * w + x] = Tile.Crate;
+      if (!far) continue;
+      add(nx, ny);
+      placed = true;
       break;
     }
+    if (!placed) active.splice(ai, 1);
+  }
+
+  // turn a few of the sampled points into crates where the footprint is clear
+  rng.shuffle(pts);
+  const shapes: [number, number][] = [[1, 1], [1, 1], [1, 1], [2, 1], [1, 2], [2, 2]];
+  const target = rng.int(2, 5);
+  let made = 0;
+  for (const p of pts) {
+    if (made >= target) break;
+    const [cw, ch] = shapes[rng.int(0, shapes.length - 1)];
+    const x0 = Math.min(Math.max(2, Math.floor(p.x)), w - 3 - cw + 1);
+    const y0 = Math.min(Math.max(2, Math.floor(p.y)), h - 3 - ch + 1);
+    let free = true;
+    for (let y = y0 - 1; y <= y0 + ch && free; y++) {
+      for (let x = x0 - 1; x <= x0 + cw; x++) if (tiles[y * w + x] !== Tile.Floor) { free = false; break; }
+    }
+    if (!free) continue;
+    for (let y = y0; y < y0 + ch; y++) for (let x = x0; x < x0 + cw; x++) tiles[y * w + x] = Tile.Crate;
+    made++;
   }
 }
 
 /**
- * Fallback for rooms too small for aisles: 1–`n` short free-standing shelf
- * runs (2–4 tiles) that never touch a wall or each other.
+ * Fallback for tiny rooms or WFC contradictions: 1–`n` short free-standing
+ * shelf runs (2–4 tiles) that never touch a wall or each other.
  */
 function placeFreeShelves(tiles: Tile[], w: number, h: number, n: number, rng: Mulberry32): void {
   for (let s = 0; s < n; s++) {
