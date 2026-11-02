@@ -135,7 +135,7 @@ export class Renderer {
 
     for (const e of r.exits) this.exit(px(e.pos.x), py(e.pos.y), e.kind, e.dir);
     for (const t of r.traps) this.trap(px(t.pos.x), py(t.pos.y));
-    for (const c of state.clouds) this.poisonCloud(px(c.x), py(c.y));
+    for (const c of state.clouds) this.poisonCloud(px(c.x), py(c.y), (c as any).active ?? true);
     for (const f of r.food) this.food(px(f.pos.x), py(f.pos.y), f.kind);
     // --- characters, at their visual poses ---
     const anim = opts.anim;
@@ -546,11 +546,82 @@ export class Renderer {
         ctx.fillStyle = "#f5f5f0"; ctx.beginPath(); ctx.roundRect(cx + T * 0.28, cy + T * 0.44, T * 0.44, T * 0.22, T * 0.1); ctx.fill();
         ctx.fillStyle = "#ff8c66"; ctx.beginPath(); ctx.roundRect(cx + T * 0.28, cy + T * 0.4, T * 0.44, T * 0.1, [T * 0.1, T * 0.1, 0, 0]); ctx.fill();
         break;
-      case "shrimp":
-        ctx.strokeStyle = "#ff8a5c"; ctx.lineWidth = T * 0.08; ctx.lineCap = "round";
-        ctx.beginPath(); ctx.arc(X, Y, T * 0.17, Math.PI * 0.2, Math.PI * 1.4); ctx.stroke();
+      case "shrimp": {
+        // Cooked prawn: hooked pink-coral body, segmented shell bands, fan tail & antennae
+        const tailX = X + T * 0.09, tailY = Y + T * 0.17;
+
+        // Antennae (curved whiskers sweeping back over the head)
+        ctx.strokeStyle = "#ff8066";
+        ctx.lineWidth = Math.max(1, T * 0.035);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(X + T * 0.14, Y - T * 0.16);
+        ctx.quadraticCurveTo(X + T * 0.38, Y - T * 0.28, X + T * 0.32, Y + T * 0.04);
+        ctx.moveTo(X + T * 0.12, Y - T * 0.18);
+        ctx.quadraticCurveTo(X + T * 0.32, Y - T * 0.38, X + T * 0.38, Y - T * 0.08);
+        ctx.stroke();
+
+        // Tail fan flukes (telson & uropods)
+        ctx.fillStyle = "#c93318";
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(tailX + T * 0.13, tailY + T * 0.09);
+        ctx.lineTo(tailX + T * 0.05, tailY + T * 0.14);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#e63e20";
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(tailX + T * 0.16, tailY + T * 0.03);
+        ctx.lineTo(tailX + T * 0.14, tailY + T * 0.11);
+        ctx.closePath();
+        ctx.fill();
+
+        // Swimmerets (little legs along inner belly)
+        ctx.strokeStyle = "#ff7b61";
+        ctx.lineWidth = Math.max(1, T * 0.035);
+        ctx.beginPath();
+        ctx.moveTo(X - T * 0.04, Y + T * 0.04); ctx.lineTo(X - T * 0.01, Y + T * 0.09);
+        ctx.moveTo(X + T * 0.01, Y - T * 0.03); ctx.lineTo(X + T * 0.05, Y - T * 0.01);
+        ctx.moveTo(X + T * 0.05, Y - T * 0.09); ctx.lineTo(X + T * 0.1, Y - T * 0.13);
+        ctx.stroke();
+
+        // Main curled body
+        ctx.beginPath();
+        ctx.moveTo(X + T * 0.22, Y - T * 0.15); // rostrum tip
+        ctx.bezierCurveTo(X + T * 0.18, Y - T * 0.25, X + T * 0.04, Y - T * 0.26, X - T * 0.12, Y - T * 0.2);
+        ctx.bezierCurveTo(X - T * 0.28, Y - T * 0.12, X - T * 0.28, Y + T * 0.14, X - T * 0.1, Y + T * 0.22);
+        ctx.bezierCurveTo(X - T * 0.02, Y + T * 0.24, X + T * 0.06, Y + T * 0.21, tailX, tailY);
+        ctx.bezierCurveTo(X - T * 0.02, Y + T * 0.14, X - T * 0.12, Y + T * 0.08, X - T * 0.12, Y - T * 0.04);
+        ctx.bezierCurveTo(X - T * 0.12, Y - T * 0.12, X + T * 0.02, Y - T * 0.14, X + T * 0.13, Y - T * 0.08);
+        ctx.closePath();
+
+        ctx.fillStyle = "#ff6243";
+        ctx.fill();
+        ctx.strokeStyle = "#c93318";
+        ctx.lineWidth = Math.max(1, T * 0.032);
+        ctx.stroke();
+
+        // Segment stripes across the back shell
+        ctx.strokeStyle = "#ffe6df";
+        ctx.lineWidth = Math.max(1, T * 0.045);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(X + T * 0.03, Y - T * 0.24); ctx.lineTo(X + T * 0.07, Y - T * 0.11);
+        ctx.moveTo(X - T * 0.15, Y - T * 0.18); ctx.lineTo(X - T * 0.08, Y - T * 0.06);
+        ctx.moveTo(X - T * 0.22, Y - T * 0.01); ctx.lineTo(X - T * 0.12, Y + T * 0.02);
+        ctx.moveTo(X - T * 0.17, Y + T * 0.15); ctx.lineTo(X - T * 0.06, Y + T * 0.15);
+        ctx.stroke();
         ctx.lineCap = "butt";
+
+        // Eye dot
+        ctx.fillStyle = "#1a1614";
+        ctx.beginPath();
+        ctx.arc(X + T * 0.14, Y - T * 0.16, Math.max(1.2, T * 0.035), 0, Math.PI * 2);
+        ctx.fill();
         break;
+      }
       case "steak":
         ctx.fillStyle = "#6e3b2a"; ctx.beginPath(); ctx.roundRect(cx + T * 0.26, cy + T * 0.35, T * 0.48, T * 0.32, T * 0.1); ctx.fill();
         ctx.fillStyle = "#d98a7a"; ctx.beginPath(); ctx.ellipse(X, Y + 1, T * 0.14, T * 0.09, 0, 0, 7); ctx.fill();
@@ -618,11 +689,42 @@ export class Renderer {
     ctx.beginPath(); ctx.moveTo(cx + T * 0.5, cy + T * 0.34); ctx.lineTo(cx + T * 0.64, cy + T * 0.62); ctx.lineTo(cx + T * 0.36, cy + T * 0.62); ctx.closePath(); ctx.fill();
   }
 
-  private poisonCloud(cx: number, cy: number) {
+  private poisonCloud(cx: number, cy: number, active = true) {
     const ctx = this.ctx;
-    ctx.fillStyle = "rgba(80,200,80,0.45)";
+    const X = cx + T / 2;
+    const Y = cy + T / 2;
+    if (!active) {
+      // Telegraph / warning (turn 0-1): arsenic dust cloud settling
+      ctx.fillStyle = "rgba(180, 225, 70, 0.26)";
+      ctx.beginPath();
+      ctx.arc(X, Y, T * 0.46, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Faint warning perimeter
+      ctx.strokeStyle = "rgba(190, 235, 60, 0.5)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(X, Y, T * 0.38, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      return;
+    }
+    // Active toxic cloud (turn 2+): thick billowing poisonous green mist
+    ctx.fillStyle = "rgba(50, 190, 70, 0.38)";
     ctx.beginPath();
-    ctx.arc(cx + T / 2, cy + T / 2, T * 0.45, 0, Math.PI * 2);
+    ctx.arc(X, Y, T * 0.52, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(70, 210, 80, 0.52)";
+    ctx.beginPath();
+    ctx.arc(X, Y, T * 0.36, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Toxic droplet highlight
+    ctx.fillStyle = "rgba(150, 245, 90, 0.4)";
+    ctx.beginPath();
+    ctx.arc(X - T * 0.08, Y - T * 0.08, T * 0.15, 0, Math.PI * 2);
     ctx.fill();
   }
 
