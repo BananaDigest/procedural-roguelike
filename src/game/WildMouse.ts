@@ -1,11 +1,11 @@
 /**
- * @file DementedMouse.ts
+ * @file WildMouse.ts
  *
- * "Тімейт з деменцією" (Demented mouse teammate) system for "А тебе?".
+ * "Дика миша" (Wild mouse teammate) system for "А тебе?".
  *
  * Appearance:
  * - Brown mouse with sticking hairs, bitten ear, drool, one tooth, and enlarged eyes.
- * - 13 HP (DEMENTED_MOUSE_HP).
+ * - 13 HP (WILD_MOUSE_HP).
  *
  * Behavior:
  * - Moves randomly and attacks either adjacent enemies or the player randomly.
@@ -16,7 +16,7 @@
  */
 
 import {
-  DementedMouse,
+  WildMouse,
   Vec2,
   Room,
   Enemy,
@@ -26,9 +26,9 @@ import {
 } from "../core/types.ts";
 import { Mulberry32 } from "../rng/Mulberry32.ts";
 import {
-  DEMENTED_MOUSE_HP,
-  DEMENTED_MOUSE_DAMAGE,
-  DEMENTED_MOUSE_STEPS_PER_TURN,
+  WILD_MOUSE_HP,
+  WILD_MOUSE_DAMAGE,
+  WILD_MOUSE_STEPS_PER_TURN,
 } from "./balance.ts";
 import { removeDeadEnemies } from "./Combat.ts";
 import { isAdjacent } from "./Enemy.ts";
@@ -43,26 +43,26 @@ const CARDINAL_DIRS: readonly Vec2[] = [
 ];
 
 /**
- * Create a new demented mouse at the given position.
+ * Create a new wild mouse at the given position.
  */
-export function createDementedMouse(pos: Vec2): DementedMouse {
+export function createWildMouse(pos: Vec2): WildMouse {
   return {
     pos: { ...pos },
-    hp: DEMENTED_MOUSE_HP,
-    maxHp: DEMENTED_MOUSE_HP,
+    hp: WILD_MOUSE_HP,
+    maxHp: WILD_MOUSE_HP,
   };
 }
 
 /**
- * The demented mouse attacks the player.
+ * The wild mouse attacks the player.
  * If the player has active flies, one fly intercepts as a living shield.
  */
-export function dementedMouseAttackPlayer(
-  mouse: DementedMouse,
+export function wildMouseAttackPlayer(
+  mouse: WildMouse,
   player: Player,
   flies?: Fly[],
 ): { hitFly: Fly | null; damage: number } {
-  const dmg = DEMENTED_MOUSE_DAMAGE;
+  const dmg = WILD_MOUSE_DAMAGE;
   emitAttack(mouse, player.pos, true);
 
   if (flies && flies.length > 0) {
@@ -93,23 +93,23 @@ export function dementedMouseAttackPlayer(
 }
 
 /**
- * The demented mouse attacks an enemy.
+ * The wild mouse attacks an enemy.
  */
-export function dementedMouseAttackEnemy(
-  mouse: DementedMouse,
+export function wildMouseAttackEnemy(
+  mouse: WildMouse,
   enemy: Enemy,
 ): boolean {
-  const dmg = DEMENTED_MOUSE_DAMAGE;
+  const dmg = WILD_MOUSE_DAMAGE;
   emitAttack(mouse, enemy.pos);
   enemy.hp -= dmg;
   return enemy.hp <= 0;
 }
 
 /**
- * Execute a single step/action for the demented mouse (attack or move).
+ * Execute a single step/action for the wild mouse (attack or move).
  */
-export function stepDementedMouse(
-  mouse: DementedMouse,
+export function stepWildMouse(
+  mouse: WildMouse,
   room: Room,
   player: Player,
   flies: Fly[],
@@ -143,9 +143,9 @@ export function stepDementedMouse(
   if (willAttack && targets.length > 0) {
     const chosen = rng.pick(targets);
     if (chosen.kind === "player") {
-      dementedMouseAttackPlayer(mouse, player, flies);
+      wildMouseAttackPlayer(mouse, player, flies);
     } else {
-      const killed = dementedMouseAttackEnemy(mouse, chosen.enemy);
+      const killed = wildMouseAttackEnemy(mouse, chosen.enemy);
       if (killed) {
         removeDeadEnemies(room);
       }
@@ -176,9 +176,9 @@ export function stepDementedMouse(
     // Trapped: attack anyway if target is adjacent
     const chosen = rng.pick(targets);
     if (chosen.kind === "player") {
-      dementedMouseAttackPlayer(mouse, player, flies);
+      wildMouseAttackPlayer(mouse, player, flies);
     } else {
-      const killed = dementedMouseAttackEnemy(mouse, chosen.enemy);
+      const killed = wildMouseAttackEnemy(mouse, chosen.enemy);
       if (killed) {
         removeDeadEnemies(room);
       }
@@ -187,19 +187,19 @@ export function stepDementedMouse(
 }
 
 /**
- * Process one player turn for the demented mouse.
- * The demented teammate takes 2 steps per 1 player turn (fast movement & actions).
+ * Process one player turn for the wild mouse.
+ * The wild teammate takes 2 steps per 1 player turn (fast movement & actions).
  */
-export function processDementedMouseTurn(
-  mouse: DementedMouse,
+export function processWildMouseTurn(
+  mouse: WildMouse,
   room: Room,
   player: Player,
   flies: Fly[],
   rng: Mulberry32,
 ): void {
-  for (let s = 0; s < DEMENTED_MOUSE_STEPS_PER_TURN; s++) {
+  for (let s = 0; s < WILD_MOUSE_STEPS_PER_TURN; s++) {
     if (mouse.hp <= 0) break;
-    stepDementedMouse(mouse, room, player, flies, rng);
+    stepWildMouse(mouse, room, player, flies, rng);
   }
 }
 

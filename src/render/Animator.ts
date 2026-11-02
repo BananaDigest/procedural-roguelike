@@ -17,7 +17,7 @@ import type { GameEvent } from "../game/events.ts";
 import { BOSS_PHASE2_HP_THRESHOLD } from "../game/balance.ts";
 import { ANIM } from "../config.ts";
 
-type ActorKind = "player" | "enemy" | "demented" | "fly";
+type ActorKind = "player" | "enemy" | "wild" | "fly";
 /** ghosts can also be a picked-up maggot (the one floor object that animates) */
 type GhostKind = ActorKind | "maggot";
 
@@ -78,8 +78,8 @@ export interface Ghost {
   t0: number;
 }
 
-/** Cosmetic per-frame face parameters of the demented teammate. */
-export interface DementedFace {
+/** Cosmetic per-frame face parameters of the wild teammate. */
+export interface WildFace {
   hair: Vec2[]; // jitter of the 4 hair tips, tiles
   pupil: Vec2; // pupil offset, tiles
   drool: number; // 0..1 cycle phase
@@ -180,7 +180,7 @@ export class Animator {
       t.lungeDir = { x: dx / len, y: dy / len };
       t.lungeT0 = now;
       t.lungeDelay = moved.has(e.actor) ? ANIM.moveMs : 0;
-      if (t.kind === "demented" && e.targetIsPlayer) {
+      if (t.kind === "wild" && e.targetIsPlayer) {
         t.shakeT0 = now + t.lungeDelay;
         t.lungeDelay += ANIM.shakeMs;
       }
@@ -209,7 +209,7 @@ export class Animator {
     for (const t of this.tracks.values()) {
       if (t.kind === "fly" || now < t.nextBlink) continue;
       t.blinkT0 = now;
-      const crazy = t.kind === "demented";
+      const crazy = t.kind === "wild";
       t.blink2T0 = crazy && Math.random() < ANIM.doubleBlinkChance ? now + ANIM.blinkMs + ANIM.doubleBlinkGapMs : NEVER;
       t.nextBlink = now + nextBlinkIn(crazy);
     }
@@ -352,8 +352,8 @@ export class Animator {
     return Math.sin((2 * Math.PI * now) / ANIM.tailMs) * ANIM.tailSway;
   }
 
-  /** Twitchy details of the demented teammate for this frame. */
-  dementedFace(now: number): DementedFace {
+  /** Twitchy details of the wild teammate for this frame. */
+  wildFace(now: number): WildFace {
     const step = Math.floor(now / ANIM.hairJitterMs);
     const hair = [0, 1, 2, 3].map((i) => ({
       x: (hash(step * 7 + i) - 0.5) * 2 * ANIM.hairJitter,
@@ -380,8 +380,8 @@ export class Animator {
   private *actors(state: GameState): Generator<[object, ActorKind, Vec2, number]> {
     yield [state.player, "player", state.player.pos, state.player.hp];
     for (const e of state.room.enemies) if (e.hp > 0) yield [e, "enemy", e.pos, e.hp];
-    const dm = state.room.dementedMouse;
-    if (dm && dm.hp > 0) yield [dm, "demented", dm.pos, dm.hp];
+    const dm = state.room.wildMouse;
+    if (dm && dm.hp > 0) yield [dm, "wild", dm.pos, dm.hp];
     for (const f of state.flies) if (f.hp > 0) yield [f, "fly", f.pos, f.hp];
   }
 
@@ -444,7 +444,7 @@ export class Animator {
       phase: Math.random() * 10000,
       blinkT0: NEVER,
       blink2T0: NEVER,
-      nextBlink: now + Math.random() * nextBlinkIn(kind === "demented"),
+      nextBlink: now + Math.random() * nextBlinkIn(kind === "wild"),
       anchor: { x: pos.x + 0.5, y: pos.y + 0.5 },
       angle: 0,
     };
@@ -514,10 +514,10 @@ function ghostMs(kind: GhostKind): number {
   return kind === "fly" ? ANIM.flyDeathMs : kind === "maggot" ? ANIM.maggotPickMs : ANIM.deathMs;
 }
 
-/** Random gap until the next blink (the demented one blinks more often). */
+/** Random gap until the next blink (the wild one blinks more often). */
 function nextBlinkIn(crazy: boolean): number {
-  const lo = crazy ? ANIM.dementedBlinkMinMs : ANIM.blinkMinMs;
-  const hi = crazy ? ANIM.dementedBlinkMaxMs : ANIM.blinkMaxMs;
+  const lo = crazy ? ANIM.wildBlinkMinMs : ANIM.blinkMinMs;
+  const hi = crazy ? ANIM.wildBlinkMaxMs : ANIM.blinkMaxMs;
   return lo + Math.random() * (hi - lo);
 }
 

@@ -13,7 +13,7 @@
  * pose an Animator gives (slides, lunges, tints, deaths); objects stay static.
  */
 import {
-  DementedMouse,
+  WildMouse,
   Enemy,
   EnemyKind,
   Fly,
@@ -25,7 +25,7 @@ import {
 import { BOSS_EYE_COLOR, Palette, paletteForLevel } from "./palette.ts";
 import { ANIM, MIN_WINDOW_SCALE, TILE_SIZE, VIEW } from "../config.ts";
 import { Animator } from "./Animator.ts";
-import type { DementedFace, Pose } from "./Animator.ts";
+import type { WildFace, Pose } from "./Animator.ts";
 
 const T = TILE_SIZE; // logical tile size, px
 const VW = VIEW.w;
@@ -157,10 +157,10 @@ export class Renderer {
       if (ghost.kind === "enemy") {
         const en = ghost.obj as Enemy;
         this.actor(px(pose.x), py(pose.y), pose, (cx, cy) => this.enemy(cx, cy, en, 0, false));
-      } else if (ghost.kind === "demented") {
-        const dm = ghost.obj as DementedMouse;
-        const face = anim?.dementedFace(now);
-        this.actor(px(pose.x), py(pose.y), pose, (cx, cy) => this.dementedMouse(cx, cy, dm, face, false));
+      } else if (ghost.kind === "wild") {
+        const dm = ghost.obj as WildMouse;
+        const face = anim?.wildFace(now);
+        this.actor(px(pose.x), py(pose.y), pose, (cx, cy) => this.wildMouse(cx, cy, dm, face, false));
       }
     }
 
@@ -170,12 +170,12 @@ export class Renderer {
       this.actor(cx, cy, pose, (x, y) => this.enemy(x, y, en, pose.mop, pose.blink), cy + T * enemyFoot(en));
       this.enemyBar(cx, cy, en); // drawn apart from the sprite → it doesn't breathe
     }
-    const dm = r.dementedMouse;
+    const dm = r.wildMouse;
     if (dm && dm.hp > 0) {
       const pose = poseOf(dm, dm.pos.x, dm.pos.y);
-      const face = anim?.dementedFace(now);
+      const face = anim?.wildFace(now);
       const cx = px(pose.x), cy = py(pose.y);
-      this.actor(cx, cy, pose, (x, y) => this.dementedMouse(x, y, dm, face, pose.blink));
+      this.actor(cx, cy, pose, (x, y) => this.wildMouse(x, y, dm, face, pose.blink));
       // teammate bar: like the enemies' but green, so he never reads as a foe
       this.healthBar(cx + T * 0.15, cy - T * 0.05, T * 0.7, dm.hp, dm.maxHp, "#44dd66");
     }
@@ -292,7 +292,7 @@ export class Renderer {
   /**
    * A catalog icon: a standalone canvas that draws the EXACT in-game sprite
    * (same private methods) and animates itself — idle breathing, blinking,
-   * tail sway, buzzing wings, the demented one's twitches. It drives its own
+   * tail sway, buzzing wings, the wild one's twitches. It drives its own
    * shared rAF loop and stops automatically once it leaves the DOM.
    */
   makeIcon(kind: string): HTMLCanvasElement {
@@ -353,8 +353,8 @@ export class Renderer {
       case "fly":
         this.fly(off, off, { pos, hp: 1, maxHp: 1 }, a.wingWidth(now));
         break;
-      case "demented":
-        this.dementedMouse(off, off, { pos, hp: 1, maxHp: 1 }, a.dementedFace(now), blink);
+      case "wild":
+        this.wildMouse(off, off, { pos, hp: 1, maxHp: 1 }, a.wildFace(now), blink);
         break;
       case "cashier":
       case "loader":
@@ -368,9 +368,9 @@ export class Renderer {
     this.ctx = saved;
   }
 
-  /** Periodic blink for catalog icons; the demented one blinks more, and kinds desync by phase. */
+  /** Periodic blink for catalog icons; the wild one blinks more, and kinds desync by phase. */
   private iconBlink(kind: string, now: number): boolean {
-    const cycle = kind === "demented" ? 2200 : 3600;
+    const cycle = kind === "wild" ? 2200 : 3600;
     const phase = kind.length * 500; // so they don't all blink in lockstep (or at t=0)
     return (now + phase) % cycle < ANIM.blinkMs;
   }
@@ -704,8 +704,8 @@ export class Renderer {
     ctx.fill();
   }
 
-  // --- demented teammate ("Тімейт з деменцією") ---
-  private dementedMouse(cx: number, cy: number, _mouse: DementedMouse, face?: DementedFace, blink = false) {
+  // --- wild teammate ("Дика миша") ---
+  private wildMouse(cx: number, cy: number, _mouse: WildMouse, face?: WildFace, blink = false) {
     const ctx = this.ctx;
     const hj = (i: number) => face?.hair[i] ?? { x: 0, y: 0 };
     const pu = face?.pupil ?? { x: 0, y: 0 };

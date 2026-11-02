@@ -9,7 +9,7 @@ import {
   GUARD_HP, GUARD_DAMAGE,
   BOSS_HP, BOSS_DAMAGE,
   FLY_HP, FLY_DAMAGE,
-  DEMENTED_MOUSE_HP, DEMENTED_MOUSE_DAMAGE,
+  WILD_MOUSE_HP, WILD_MOUSE_DAMAGE,
 } from "../game/balance.ts";
 
 /** Characters shown in the catalog (icon, name, funny blurb, live HP/DMG from balance). */
@@ -20,7 +20,7 @@ const ROSTER: { kind: string; name: string; desc: string; hp: number; dmg: numbe
   { kind: "guard", name: "Guard", desc: "Takes 'loss prevention' personally. Will pursue one (1) mouse across the entire store.", hp: GUARD_HP, dmg: GUARD_DAMAGE },
   { kind: "boss", name: "The Cleaner", desc: "Final boss. Mops first, asks questions never. Flings rat poison the instant you corner her.", hp: BOSS_HP, dmg: BOSS_DAMAGE },
   { kind: "fly", name: "Fly", desc: "Your buzzing little sidekick. Bites enemies so your paws stay clean.", hp: FLY_HP, dmg: FLY_DAMAGE },
-  { kind: "demented", name: "Demented Mouse", desc: "A mouse that lost the plot. Shuffles in circles muttering about expired yogurt.", hp: DEMENTED_MOUSE_HP, dmg: DEMENTED_MOUSE_DAMAGE },
+  { kind: "wild", name: "Wild Mouse", desc: "A mouse that lost the plot. Shuffles in circles muttering about expired yogurt.", hp: WILD_MOUSE_HP, dmg: WILD_MOUSE_DAMAGE },
 ];
 
 export class Screens {

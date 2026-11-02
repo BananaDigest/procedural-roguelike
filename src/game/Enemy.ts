@@ -99,7 +99,7 @@ function getValidMoves(
       isWalkable(room, nx, ny) &&
       isFreeOfEnemies(nx, ny, enemies, enemy) &&
       (nx !== playerPos.x || ny !== playerPos.y) &&
-      (!room.dementedMouse || room.dementedMouse.hp <= 0 || nx !== room.dementedMouse.pos.x || ny !== room.dementedMouse.pos.y)
+      (!room.wildMouse || room.wildMouse.hp <= 0 || nx !== room.wildMouse.pos.x || ny !== room.wildMouse.pos.y)
     ) {
       result.push({ x: nx, y: ny });
     }
@@ -210,19 +210,19 @@ function stepEnemy(
     }
   }
 
-  // Adjacent to demented mouse teammate → attack the demented mouse!
+  // Adjacent to wild mouse teammate → attack the wild mouse!
   if (
-    room.dementedMouse &&
-    room.dementedMouse.hp > 0 &&
-    isAdjacent(enemy.pos, room.dementedMouse.pos)
+    room.wildMouse &&
+    room.wildMouse.hp > 0 &&
+    isAdjacent(enemy.pos, room.wildMouse.pos)
   ) {
-    emitAttack(enemy, room.dementedMouse.pos);
-    room.dementedMouse.hp = Math.max(
+    emitAttack(enemy, room.wildMouse.pos);
+    room.wildMouse.hp = Math.max(
       0,
-      room.dementedMouse.hp - enemyAttackDamage(enemy.kind),
+      room.wildMouse.hp - enemyAttackDamage(enemy.kind),
     );
-    if (room.dementedMouse.hp <= 0) {
-      room.dementedMouse = null;
+    if (room.wildMouse.hp <= 0) {
+      room.wildMouse = null;
     }
     return true;
   }

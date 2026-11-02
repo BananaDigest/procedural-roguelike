@@ -22,8 +22,8 @@ import {
   maggotSpawnChanceForLevel,
   trapCountForLevel,
 } from "./Spawns.ts";
-import { createDementedMouse } from "../game/DementedMouse.ts";
-import { DEMENTED_MOUSE_MIN_LEVEL, DEMENTED_MOUSE_SPAWN_CHANCE } from "../game/balance.ts";
+import { createWildMouse } from "../game/WildMouse.ts";
+import { WILD_MOUSE_MIN_LEVEL, WILD_MOUSE_SPAWN_CHANCE } from "../game/balance.ts";
 
 export interface RoomSpec {
   baseSeed: number;
@@ -100,7 +100,7 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
     food: [],
     traps: [],
     items: [],
-    dementedMouse: null,
+    wildMouse: null,
     isBossArena: arena,
   };
 
@@ -239,11 +239,11 @@ function buildRoom(spec: RoomSpec, rng: Mulberry32, withShelves: boolean): Room 
     }
   }
 
-  // 9. demented teammate ("Тімейт з деменцією") — 50% chance starting level 7
-  if (level >= DEMENTED_MOUSE_MIN_LEVEL && !arena && rng.chance(DEMENTED_MOUSE_SPAWN_CHANCE)) {
+  // 9. wild teammate ("Дика миша") — 50% chance starting level 7
+  if (level >= WILD_MOUSE_MIN_LEVEL && !arena && rng.chance(WILD_MOUSE_SPAWN_CHANCE)) {
     const p = take(reachable);
     if (p) {
-      room.dementedMouse = createDementedMouse(p);
+      room.wildMouse = createWildMouse(p);
     }
   }
 
