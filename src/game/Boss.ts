@@ -15,23 +15,23 @@
  *   `kind === "boss"`.
  *
  * - **Ranged — rat poison (миш'як):**
- *   Every N player turns the boss throws rat-poison at the mouse's current
- *   position, spawning a poison cloud on that cell.
+ *   Every N player turns the boss throws rat-poison at the player's position,
+ *   spawning an irregular poison cloud (2 to 5 cells in width and height,
+ *   never a square/rectangle/circle) generated organically.
  *
- *   ### Telegraph mechanic
- *   Clouds are **telegraphed**: when a cloud is placed it does NOT deal
- *   damage immediately. Instead, it appears visually on the arena floor
- *   to warn the player. Damage is applied on the **next** player turn —
- *   only if the player is still standing in the cloud. This gives the
- *   player one turn to move out of the way.
+ *   ### Telegraph mechanic & Turn timing:
+ *   - Turn 0 (throw turn): cloud appears visually, 0 damage.
+ *   - Turn 1 (player's 1st step): telegraph/reaction step, 0 damage.
+ *   - Turn 2+ (player's 2nd step and onward): deals poison damage each step
+ *     the player is inside the cloud until it despawns.
+ *   - If the player leaves and later returns while the cloud is still alive,
+ *     poison damage applies as long as they are inside.
  *
- *   Clouds dissipate automatically after 3 turns.
+ *   Clouds dissipate automatically after BOSS_POISON_CLOUD_DURATION turns.
  *
  *   ### Phases
- *   - **Phase 1** (HP > 50 %): throws every 4 turns, 1 cloud per throw.
- *   - **Phase 2** (HP ≤ 50 %): throws every 2 turns, 2 clouds per throw
- *     (the second cloud lands on a random cardinal-adjacent cell to the
- *     player's position).
+ *   - **Phase 1** (HP > 50 %): throws every 4 turns, 1 irregular cloud per throw.
+ *   - **Phase 2** (HP ≤ 50 %): throws every 2 turns, 1 irregular cloud per throw.
  */
 
 import { Vec2, Room, Player, Enemy } from "../core/types.ts";
@@ -43,8 +43,10 @@ import {
   BOSS_RATPOISON_INTERVAL_P2,
   BOSS_RATPOISON_CLOUDS_P1,
   BOSS_RATPOISON_CLOUDS_P2,
+  BOSS_POISON_CLOUD_DURATION,
   BOSS_HP,
 } from "./balance.ts";
+import { generatePoisonCloudTiles } from "./PoisonCloudGen.ts";
 import { emitGameEvent } from "./events.ts";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -52,17 +54,16 @@ import { emitGameEvent } from "./events.ts";
 /**
  * A poison cloud sitting on the arena floor.
  *
- * Clouds are **telegraphed**: they appear one turn before they become
- * dangerous.  The renderer can use `placedOnTurn` to show a warning
- * sprite on the placement turn and a "damage" sprite on subsequent turns.
+ * Clouds are **telegraphed**: they appear on turn 0, give a 1-step grace
+ * period on turn 1, and become toxic starting on step 2 (`turnCount - placedOnTurn >= 2`).
  */
 export interface PoisonCloud {
   /** World position of the cloud inside the boss arena. */
   pos: Vec2;
   /**
    * The boss-fight turn number when this cloud was placed.
-   * Damage is only applied when `BossState.turnCount > placedOnTurn`
-   * (i.e. the turn AFTER placement).
+   * Damage is only applied when `BossState.turnCount - placedOnTurn >= 2`
+   * (i.e. on the 2nd step and subsequent steps).
    */
   placedOnTurn: number;
 }
@@ -117,12 +118,11 @@ function isPhase2(boss: Enemy): boolean {
  * Process boss-specific logic **after** regular enemy turns.
  *
  * Execution order each player turn:
- * 1. **Poison damage** — any cloud placed on a *previous* turn that
- *    overlaps the player's current position applies poison damage.
- * 2. **Cloud cleanup** — clouds older than 3 turns are removed.
+ * 1. **Poison damage** — any active cloud (turnCount - placedOnTurn >= 2)
+ *    that overlaps the player's current position applies poison damage.
+ * 2. **Cloud cleanup** — clouds older than BOSS_POISON_CLOUD_DURATION turns are removed.
  * 3. **Rat-poison throw** — if the turn counter hits the interval for
- *    the current phase, new clouds are spawned (telegraphed — they will
- *    only deal damage on the *next* call).
+ *    the current phase, new irregular clouds are spawned.
  * 4. **Defeat check** — if the boss's HP has reached 0 (via melee
  *    handled elsewhere), mark the fight as won so the caller can
  *    spawn the Big Cheese and transition to the win state.
@@ -152,20 +152,25 @@ export function processBossTurn(
 
   bossState.turnCount++;
 
-  // ── 1. Apply poison damage from clouds placed on previous turns ──
-  for (const cloud of bossState.clouds) {
-    if (
-      cloud.placedOnTurn < bossState.turnCount &&
-      cloud.pos.x === player.pos.x &&
-      cloud.pos.y === player.pos.y
-    ) {
-      applyPoisonDamage(player);
-    }
+  // ── 1. Apply poison damage ──────────────────────────────────────
+  // Timing rules:
+  // - Step 0 (placement turn): 0 damage (telegraph).
+  // - Step 1 (player's 1st move): 0 damage (reaction step).
+  // - Step 2+ (player's 2nd move onward): damage applied if standing in cloud.
+  // - Leaving and re-entering continues to apply damage while inside.
+  const inActivePoison = bossState.clouds.some(
+    c =>
+      bossState.turnCount - c.placedOnTurn >= 2 &&
+      c.pos.x === player.pos.x &&
+      c.pos.y === player.pos.y,
+  );
+  if (inActivePoison) {
+    applyPoisonDamage(player);
   }
 
-  // ── 2. Remove old clouds (dissipate after 3 turns) ───────────────
+  // ── 2. Remove old clouds after BOSS_POISON_CLOUD_DURATION turns ─
   bossState.clouds = bossState.clouds.filter(
-    c => bossState.turnCount - c.placedOnTurn <= 3,
+    c => bossState.turnCount - c.placedOnTurn <= BOSS_POISON_CLOUD_DURATION,
   );
 
   // ── 3. Rat-poison throw ──────────────────────────────────────────
@@ -179,25 +184,31 @@ export function processBossTurn(
 
   if (bossState.turnCount % interval === 0) {
     emitGameEvent({ type: "bossThrow", actor: boss });
-    // First cloud always lands at the player's current position.
-    bossState.clouds.push({
-      pos: { x: player.pos.x, y: player.pos.y },
-      placedOnTurn: bossState.turnCount,
-    });
-
-    // Additional clouds land on random cardinal-adjacent cells (phase 2).
-    const dirs: readonly Vec2[] = [
-      { x: 0, y: -1 },
-      { x: 0, y: 1 },
-      { x: -1, y: 0 },
-      { x: 1, y: 0 },
-    ];
-    for (let i = 1; i < cloudCount; i++) {
-      const d = rng.pick(dirs);
-      bossState.clouds.push({
-        pos: { x: player.pos.x + d.x, y: player.pos.y + d.y },
-        placedOnTurn: bossState.turnCount,
-      });
+    for (let i = 0; i < cloudCount; i++) {
+      const origin =
+        i === 0
+          ? player.pos
+          : {
+              x: player.pos.x + rng.int(-2, 2),
+              y: player.pos.y + rng.int(-2, 2),
+            };
+      const tiles = generatePoisonCloudTiles(origin, room, rng);
+      for (const tile of tiles) {
+        const existing = bossState.clouds.find(
+          c => c.pos.x === tile.x && c.pos.y === tile.y,
+        );
+        if (existing) {
+          existing.placedOnTurn = Math.min(
+            existing.placedOnTurn,
+            bossState.turnCount,
+          );
+        } else {
+          bossState.clouds.push({
+            pos: tile,
+            placedOnTurn: bossState.turnCount,
+          });
+        }
+      }
     }
   }
 

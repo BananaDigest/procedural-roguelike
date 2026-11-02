@@ -182,7 +182,10 @@ export const BOSS_RATPOISON_INTERVAL_P2 = 2 as const;
 export const BOSS_RATPOISON_CLOUDS_P1 = 1 as const;
 
 /** Phase 2: number of poison clouds per throw. */
-export const BOSS_RATPOISON_CLOUDS_P2 = 2 as const;
+export const BOSS_RATPOISON_CLOUDS_P2 = 1 as const;
+
+/** Total turns a poison cloud remains on the ground before despawning (1 warning turn + 3 damage turns). */
+export const BOSS_POISON_CLOUD_DURATION = 4 as const;
 
 // ── Room generation bounds ────────────────────────────────────────
 
