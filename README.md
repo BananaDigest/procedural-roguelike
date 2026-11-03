@@ -11,9 +11,6 @@ Canvas. Everything is drawn in code: there are no sprite or image assets.
 <!-- TODO: replace with a ~15-second GIF that shows 3 different dungeons (3 different seeds) -->
 ![Three different runs — GIF placeholder](docs/screenshots/runs.gif)
 
-> **GIF placeholder:** record about 15 seconds that show three runs with
-> different seeds, then save the file as `docs/screenshots/runs.gif`.
-
 ---
 
 ## Gameplay in one minute
@@ -32,11 +29,12 @@ Canvas. Everything is drawn in code: there are no sprite or image assets.
 
 ## Controls
 
-| Keys | Action |
+| Controls | Action |
 | --- | --- |
 | `W A S D` / arrow keys / numpad `8 4 6 2` | Move one tile; moving into an enemy attacks it |
-| `Esc` | Pause menu (press again to resume) |
-| `M` / `Tab` | Show or hide the minimap |
+| **Swipe** (up / down / left / right) | Move one tile; swipe into an enemy to attack (touchscreen / mobile) |
+| `Esc` / Pause button `||` | Pause menu (press again to resume) |
+| `M` / `Tab` / Map button `M` | Show or hide the minimap (or tap radar) |
 | `R` | Start a new run with a random seed |
 | Title screen | Type a seed (number or any text) and press **Start**; leave it empty for a random seed |
 
@@ -92,15 +90,31 @@ seed ─► LevelChain ─► room 0 ⇄нора⇄ room 1 ⇄нора⇄ … �
 
 ### The algorithms and why we picked them
 
-| Part | Algorithm | Why |
-| --- | --- | --- |
-| Room layout | **Wave Function Collapse** on the room interior (`placeShelvesWFC`) | The setting is a shop, so rooms need straight **shelf aisles**, not caves. WFC builds these rows from local adjacency rules: horizontal runs never stack and vertical runs never sit side by side. That keeps the aisles walkable and still makes every room different. |
-| Clutter | **Bridson Poisson-disk sampling** (`placeCratesPoisson`) | Crates should be spread out evenly without clumping. Poisson-disk sampling keeps a minimum distance between points. The crates are 1×1 tiles, pairs or 2×2 stacks. |
-| Exit placement | **Farthest-cell selection** (`takeFar`, Manhattan distance) | The forward exit goes as far from the entrance as the room allows, so you actually have to cross the room. |
-| Safety net | **Flood fill**, 4-directional (`ConnectivityCheck.ts`) | WFC and the crates can block a path. Every exit and spawn must be reachable from the entry, otherwise the room is regenerated from the next seed. |
-| Level structure | **Linear room chain** (`LevelChain.ts`) | Each room is its own screen, with no corridors. A chain fits the "sneak through the shop" fantasy and keeps backtracking simple. |
-| Minimap corridors | **Drunkard's Walk** with a target bias (`DrunkardsWalk.ts`) | The radar links the rooms of a shop with winding tunnels that look like mouse paths. The walk is seeded too, so the map stays the same for the whole floor. |
-| Boss poison clouds | **Random-walker frontier growth** (`PoisonCloudGen.ts`) | Clouds are irregular, connected blobs between 2×2 and 5×5 tiles, never a plain rectangle or circle. Each throw reads as a fresh puff of poison. |
+The game avoids third-party game engines or external black-box libraries. Every procedural generation system, random stream, and reachability check is implemented from scratch using classic algorithms:
+
+| Part | Algorithm | Implementation | Why & How It Works |
+| --- | --- | --- | --- |
+| **Room layout** | **Wave Function Collapse (WFC)**<br/>*(Simple Tiled Model + AC-3)* | `placeShelvesWFC` in [`src/generation/RoomGen.ts`](src/generation/RoomGen.ts) | The setting is a shop, so rooms need straight **shelf aisles**, not caves. WFC collapses tile superpositions using local adjacency rules: horizontal runs never stack and vertical runs never sit side by side. Keeps aisles walkable and procedurally diverse. |
+| **Clutter & obstacles** | **Bridson's Poisson-Disk Sampling** | `placeCratesPoisson` in [`src/generation/RoomGen.ts`](src/generation/RoomGen.ts) | Crates and pallet stacks should spread evenly across the floor without clumping. Poisson-disk sampling maintains a minimum distance $r$ between points in linear $O(N)$ time via a spatial acceleration grid. |
+| **Minimap corridors** | **Target-Biased Drunkard's Walk**<br/>*(Random Walk)* | `generateDrunkardCorridor` in [`src/generation/DrunkardsWalk.ts`](src/generation/DrunkardsWalk.ts) | The radar links the rooms of a shop with winding tunnels that look like organic mouse burrows. Steers random steps with a directional bias toward the target node while preventing immediate backtracking. |
+| **Safety net** | **4-Directional Flood Fill (BFS)** | `floodFill` in [`src/generation/ConnectivityCheck.ts`](src/generation/ConnectivityCheck.ts) | WFC shelves and crates can occasionally block a path. Breadth-first search validates that every exit, item, and enemy is reachable from the entry; otherwise the room is rejected and regenerated (up to 20 tries). |
+| **Boss poison clouds** | **Cellular Frontier Growth / Diffusion** | `generatePoisonCloudTiles` in [`src/game/PoisonCloudGen.ts`](src/game/PoisonCloudGen.ts) | The Cleaner's arsenic clouds must look like organic puffs of poison gas, never rigid squares or circles. Expands outward along neighbor frontiers within a 2×2 to 5×5 box into connected, strictly irregular blobs. |
+| **Exit placement** | **Farthest-Point Selection**<br/>*(Manhattan Metric / $L_1$)* | `takeFar` in [`src/generation/RoomGen.ts`](src/generation/RoomGen.ts) | The forward exit (нора or люк) is placed as far from the entrance as possible ($|\Delta x| + |\Delta y|$), ensuring the player actually has to explore and navigate across the room. |
+| **Randomness & seeds** | **Mulberry32 PRNG** | `Mulberry32` in [`src/rng/Mulberry32.ts`](src/rng/Mulberry32.ts) | Replaces `Math.random()` with a deterministic 32-bit generator (period $\approx 2^{32}$). The same seed always produces the exact same dungeon, making runs shareable and bugs reproducible. |
+| **Seed text input** | **FNV-1a 32-bit Hash**<br/>*(Fowler–Noll–Vo)* | `hashSeed` in [`src/rng/Mulberry32.ts`](src/rng/Mulberry32.ts) | Converts arbitrary player-entered alphanumeric seed strings into uniform 32-bit integer seeds with fast avalanche characteristics. |
+| **Spawn shuffling** | **Fisher–Yates / Knuth Shuffle** | `shuffle` in [`src/rng/Mulberry32.ts`](src/rng/Mulberry32.ts) | Permutes candidate coordinate lists and spawn queues in $O(N)$ time with zero statistical bias, guaranteeing uniform procedural variety. |
+| **Loot & enemy drops** | **Roulette-Wheel Selection**<br/>*(Fitness-Proportionate)* | `weighted` in [`src/rng/Mulberry32.ts`](src/rng/Mulberry32.ts) | Samples discrete probability distributions based on cumulative weight tables. Controls food rarities, power-up chances, and level-dependent enemy mixes. |
+
+### Architecture & Gameplay Patterns
+
+Complementing the procedural algorithms, the game utilizes clean software engineering patterns to coordinate gameplay, AI, and graphics:
+
+- **Two-Phase Finite State Machine (FSM):** Orchestrates Cleaner boss combat in [`src/game/Boss.ts`](src/game/Boss.ts) (Phase 1 patrol and periodic poison throws $\to$ Phase 2 enrage at $\le 50\%$ HP with rapid attacks $\to$ defeat trigger).
+- **Discrete Lockstep Turn Loop:** Classic roguelike turn cycle in [`src/game/GameImpl.ts`](src/game/GameImpl.ts) resolving player actions, hazards, companion flies, and enemy AI in a strictly deterministic sequence.
+- **Telegraphed Damage Grace Period:** Turn-buffered hazard timing in [`src/game/Boss.ts`](src/game/Boss.ts) granting a 1-step telegraph window when poison lands before active damage ticks begin on Step 2+.
+- **Grid AI Navigation Heuristics:** Greedy Manhattan minimization for aggressive chasing (Guards, Boss) and stochastic 2D lattice wandering for passive patrol (Cashiers, Loaders) in [`src/game/Enemy.ts`](src/game/Enemy.ts).
+- **Procedural Canvas Animation & Easing:** Harmonic sinusoidal wave functions (`Math.sin`) for organic idle breathing/swaying and cubic ease-out interpolation ($f(t) = 1 - (1 - t)^3$) for smooth sprite sliding between discrete tiles in [`src/render/Animator.ts`](src/render/Animator.ts).
+- **Integer-Snapping Viewport Projection:** Pixel-perfect canvas scaling in [`src/render/Renderer.ts`](src/render/Renderer.ts) snapping viewport scale to whole device pixels to prevent subpixel blurring or tile seams.
 
 Difficulty is controlled by spawn tables (`Spawns.ts`, `game/balance.ts`):
 - **Enemies:** the mix and count of enemies change per level.
@@ -167,11 +181,11 @@ These go beyond the core "generate a room" task:
 - **A circular minimap** of the current shop.
 - **A character catalog** with live animated icons and HP/damage values taken from the balance file.
 - **Resolution-independent rendering:** the whole game scales to the window from a single setting.
+- **Mobile touch & swipe controls:** full responsive touchscreen support with natural 4-way swipe gestures and on-screen HUD buttons for mobile browsers.
 - **CI/CD:** automatic deploy to GitHub Pages.
 
 ## Known limitations and TODOs
 
-- **Keyboard only.** There are no touch controls on mobile.
 - **No sound or music.**
 - **No save.** A run lasts one session; to replay a run, use its seed.
 - **The `npm run gen:check` self-test is out of date.** Some of its invariants don't match the current spawn rules, and running it directly in Node fails on interface imports. It needs updating.
@@ -183,9 +197,9 @@ These go beyond the core "generate a room" task:
 
 | Person | Area | Main files |
 | --- | --- | --- |
-| **Viktoriia (Person A)** | World generation: room and level generation, WFC shelving, Poisson crates, spawn tables, connectivity checks, room scaling, seeded randomness, debug level select, cheese-power bonus, procedural character animation | `src/generation/`, `src/rng/`, `src/render/Animator.ts`, `src/config.ts` |
-| **Sofia (Person B)** | Gameplay: turn loop, enemy AI, combat, items, flies, wild mouse, boss and poison clouds, balance, Drunkard's Walk minimap | `src/game/`, `src/generation/DrunkardsWalk.ts`, `src/ui/Minimap.ts` |
-| **Diana (Person C)** | Rendering and UI: renderer, palette, HUD, screens and catalog, input, window scaling, CI/CD deployment | `src/render/`, `src/ui/`, `src/main.ts`, `.github/workflows/` |
+| **Viktoriia** | World generation: room and level generation, WFC shelving, Poisson crates, spawn tables, connectivity checks, room scaling, seeded randomness, debug level select, cheese-power bonus, procedural character animation | `src/generation/`, `src/rng/`, `src/render/Animator.ts`, `src/config.ts` |
+| **Sofiya** | Gameplay: turn loop, enemy AI, combat, items, flies, wild mouse, boss and poison clouds, balance, Drunkard's Walk minimap | `src/game/`, `src/generation/DrunkardsWalk.ts`, `src/ui/Minimap.ts` |
+| **Diana** | Rendering and UI: renderer, palette, HUD, screens and catalog, input, window scaling, CI/CD deployment | `src/render/`, `src/ui/`, `src/main.ts`, `.github/workflows/` |
 
 ## License
 
