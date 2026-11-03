@@ -32,7 +32,6 @@ Canvas. Everything is drawn in code: there are no sprite or image assets.
 | Controls | Action |
 | --- | --- |
 | `W A S D` / arrow keys / numpad `8 4 6 2` | Move one tile; moving into an enemy attacks it |
-| **Swipe** (up / down / left / right) | Move one tile; swipe into an enemy to attack (touchscreen / mobile) |
 | `Esc` / Pause button `||` | Pause menu (press again to resume) |
 | `M` / `Tab` / Map button `M` | Show or hide the minimap (or tap radar) |
 | `R` | Start a new run with a random seed |
